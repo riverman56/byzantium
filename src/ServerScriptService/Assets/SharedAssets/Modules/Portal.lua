@@ -36,7 +36,9 @@ function Portal.new(cframe: CFrame)
 
     self.portal = portal:Clone()
     self.portal:PivotTo(cframe)
-    self.portal.Parent = workspace
+    local portals = Instance.new("Folder")
+    portals.Name = "Portals"
+    self.portal.Parent = portals
     self:open()
 end
 
@@ -55,7 +57,7 @@ function Portal:open()
 end
 
 function Portal:close()
-
+        self.portal:Destroy()
 end
 
 return Portal
