@@ -12,6 +12,9 @@ local Abilities = script.Abilities
 local ServerAssets = ServerStorage.Byzantium.ServerAssets
 local SharedAssets = ReplicatedStorage.Byzantium.SharedAssets
 
+local Modules = SharedAssets.Modules
+local Ragdoll = require(Modules.Ragdoll)
+
 local Packages = ReplicatedStorage.Byzantium.Packages
 local Ropost = require(Packages.Ropost)
 
@@ -21,7 +24,18 @@ local channel = Ropost.channel("Byzantium")
 
 local playerConnections = {}
 
+local function onCharacterAdded(character: Model)
+	Ragdoll:setup(character)
+end
+
 local function onPlayerAdded(player: Player)
+    local character = player.Character
+    if character then
+        onCharacterAdded(character)
+    end
+    
+    player.CharacterAdded:Connect(onCharacterAdded)
+
     playerConnections[player] = {}
 
     local isWhitelisted = table.find(Whitelist, player.UserId)
