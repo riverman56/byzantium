@@ -71,6 +71,13 @@ function Ragdoll:setup(character: Model)
 end
 
 function Ragdoll:setRagdoll(character: Model, isRagdolled: boolean)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return
+    end
+
+    humanoid:ChangeState(if isRagdolled then Enum.HumanoidStateType.Physics else Enum.HumanoidStateType.FallingDown)
+
     for _, ballSocketConstraint in character:GetDescendants() do
         if ballSocketConstraint:IsA("BallSocketConstraint") then
             ballSocketConstraint.Enabled = isRagdolled
@@ -78,7 +85,7 @@ function Ragdoll:setRagdoll(character: Model, isRagdolled: boolean)
     end
 
     for _, motor in character:GetDescendants() do
-        if motor:IsA("Motor6D") then
+        if motor:IsA("Motor6D") and motor.Part1.Name ~= "Head" then
             motor.Enabled = not isRagdolled
         end
     end
