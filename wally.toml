@@ -1,0 +1,9 @@
+[package]
+name = "river/byzantium"
+version = "0.0.1"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+Ropost = "sayhisam1/ropost@1.1.0"
+Flipper = "reselim/flipper@2.0.0"

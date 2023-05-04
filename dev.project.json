@@ -1,0 +1,22 @@
+{
+  "name": "byzantium",
+  "tree": {
+    "$className": "DataModel",
+
+    "ServerScriptService": {
+      "Byzantium": {
+        "Packages": {
+          "$path": "Packages"
+        },
+        "$path": "src/ServerScriptService"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Byzantium": {
+          "$path": "src/StarterPlayerScripts"
+        }
+      }
+    }
+  }
+}
