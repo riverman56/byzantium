@@ -2,3 +2,4 @@ Packages
 wally.lock
 .vscode
 **/.DS_Store
+sourcemap.json

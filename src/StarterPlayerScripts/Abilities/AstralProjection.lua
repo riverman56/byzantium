@@ -23,6 +23,7 @@ local channel = Ropost.channel("Byzantium")
 local isFlying = false
 
 local vectorForce = nil
+local supplementaryVectorForce = nil
 local alignOrientation = nil
 
 local connection = nil
@@ -86,11 +87,18 @@ local function setProjectionPhysics(enabled: boolean)
 		humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 		workspace.Gravity = 0
 
+		local motors = {}
+		for _, descendant in character:GetDescendants() do
+			if descendant:IsA("Motor6D") then
+				table.insert(motors, descendant)
+			end
+		end
+
+		animator:ApplyJointVelocities(motors)
+
 		for _, animation in animator:GetPlayingAnimationTracks() do
 			animation:Stop()
 		end
-
-		--animator:ApplyJointVelocities()
 
 		-- slow down limb physics
 		local previousLimbCFrames = {}
@@ -193,6 +201,11 @@ channel:subscribe("astralProjectAnimation", function(data)
         return
     end
 
+	local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
+	if not victimRootPart then
+		return
+	end
+
 	local fakeCharacterHumanoid = fakeCharacter:FindFirstChildOfClass("Humanoid")
 	if not fakeCharacterHumanoid then
 		return
@@ -210,22 +223,23 @@ channel:subscribe("astralProjectAnimation", function(data)
 		animation:Play()
 	end
 
-	local animationInstance = Instance.new("Animation")
-	animationInstance.AnimationId = Animations.AstralProjectVictim
-	local animation = fakeCharacterAnimator:LoadAnimation(animationInstance)
-	animation:Play()
-
     if localPlayer == victim then
-        animation:GetMarkerReachedSignal("project"):Connect(function()
-            local cameraCFrame = workspace.CurrentCamera.CFrame
-            vectorForce.Force = -cameraCFrame.LookVector * 50
+		local animationInstance = Instance.new("Animation")
+		animationInstance.AnimationId = Animations.AstralProjectVictim
+		local animation = fakeCharacterAnimator:LoadAnimation(animationInstance)
+		animation:Play()
 
+        animation:GetMarkerReachedSignal("project"):Connect(function()
 		    channel:publish("astralProjectUser", {
 			    fakeCharacter = fakeCharacter,
-                victimCharacter = victimCharacter,
 		    })
 
+			local victimCharacterMass = getMass(victimCharacter)
             setProjectionPhysics(true)
+			supplementaryVectorForce.Force += -victimRootPart.CFrame.LookVector * victimCharacterMass * 10000
+			task.delay(0.5, function()
+				supplementaryVectorForce.Force = Vector3.zero
+			end)
 	    end)
     end
 end)
@@ -248,6 +262,13 @@ local function onLocalCharacterAdded(character: Model)
 	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
 	vectorForce.Attachment0 = rootPart.RootAttachment
 	vectorForce.Parent = rootPart
+
+	supplementaryVectorForce = Instance.new("VectorForce")
+	supplementaryVectorForce.Enabled = false
+	supplementaryVectorForce.Force = Vector3.new(0, 0, 0)
+	supplementaryVectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+	supplementaryVectorForce.Attachment0 = rootPart.RootAttachment
+	supplementaryVectorForce.Parent = rootPart
 end
 
 local AstralProjection = {}
@@ -308,8 +329,14 @@ function AstralProjection:run()
 		return
 	end
 
-	local targetDestination = targetRootPart.CFrame.Position + targetRootPart.CFrame.LookVector * 2.6
+	local targetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
 	humanoid:MoveTo(targetDestination)
+
+	local cframeChangedConnection = nil
+	cframeChangedConnection = targetRootPart:GetPropertyChangedSignal("CFrame"):Connect(function()
+		local newTargetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
+		humanoid:MoveTo(newTargetDestination.CFrame)
+	end)
 
 	local moveToFinishedConnection = nil
 	moveToFinishedConnection = humanoid.MoveToFinished:Connect(function(reached)
@@ -320,6 +347,9 @@ function AstralProjection:run()
 
 		moveToFinishedConnection:Disconnect()
 		moveToFinishedConnection = nil
+
+		cframeChangedConnection:Disconnect()
+		cframeChangedConnection = nil
 
 		rootPart.CFrame = CFrame.lookAt(rootPart.Position, targetRootPart.Position)
 
