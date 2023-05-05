@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 PhysicsService:RegisterCollisionGroup("ByzantiumCharacters")
 PhysicsService:RegisterCollisionGroup("Characters")
 PhysicsService:CollisionGroupSetCollidable("Characters", "ByzantiumCharacters", false)
+PhysicsService:CollisionGroupSetCollidable("ByzantiumCharacters", "ByzantiumCharacters", false)
 
 local function onDescendantAdded(descendant)
 	if descendant:IsA("BasePart") then
