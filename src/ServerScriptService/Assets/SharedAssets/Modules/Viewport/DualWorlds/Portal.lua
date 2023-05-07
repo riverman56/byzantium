@@ -28,6 +28,7 @@ function Portal.new(surfaceGUI)
 	local self = setmetatable({}, Portal)
 	
 	self.SurfaceGUI = surfaceGUI
+	self.SurfaceGUI.Name = "PortalViewport"
 	self.Camera = Instance.new("Camera", surfaceGUI)
 	self.ViewportFrame = VPF:Clone()
 	self.ViewportFrame.CurrentCamera = self.Camera

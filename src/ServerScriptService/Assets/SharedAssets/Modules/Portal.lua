@@ -2,6 +2,8 @@ local TweenService = game:GetService("TweenService")
 local Content = script.Parent.Parent.Content
 local portal = Content.Portal
 
+local player = game.Players.LocalPlayer
+
 local TWEEN_INFO = {    
     EXPAND1 = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
     EXPAND2 = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
@@ -37,8 +39,10 @@ function Portal.new(cframe: CFrame)
     self.portal = portal:Clone()
     self.portal:PivotTo(cframe)
     local portals = workspace:FindFirstChild("Portals") or Instance.new("Folder", workspace)
-    self.portal.Parent = portals
+    self.portal.Parent = portals.Gateways
     self:open()
+    wait(5)
+    self:close()
 end
 
 function Portal:open()
@@ -57,6 +61,11 @@ end
 
 function Portal:close()
         self.portal:Destroy()
+        for _, vpf in ipairs(player.PlayerGui:GetChildren()) do
+            if vpf.Name == "PortalViewport" then
+                vpf:Destroy()
+            end
+        end
 end
 
 return Portal
