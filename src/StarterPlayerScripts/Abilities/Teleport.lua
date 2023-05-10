@@ -9,14 +9,13 @@ local castFromMouse = require(Utilities.castFromMouse)
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
 local Modules = SharedAssets.Modules
-local Portal = require(Modules.Portal)
+local Portals = require(Modules.Portals)
 
 local Content = SharedAssets.Content
 local Animations = require(Content.Animations)
 
 local Packages = replicatedStorageFolder.Packages
 local Ropost = require(Packages.Ropost)
-local Flipper = require(Packages.Flipper)
 
 local localPlayer = Players.LocalPlayer
 
@@ -29,7 +28,8 @@ channel:subscribe("teleport", function(data)
     local origin = data.origin
     local destination = data.destination
 
-    Portal.new(origin)
+    Portals.createTeleportationPortal(origin)
+    Portals.createTeleportationPortal(destination)
 end)
 
 function Teleport:setup()

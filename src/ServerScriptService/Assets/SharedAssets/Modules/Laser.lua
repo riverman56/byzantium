@@ -13,6 +13,7 @@ local TWEEN_INFO = {
 
 local Content = script.Parent.Parent.Content
 local laser = Content.Laser
+local dart = Content.Dart
 local laserOrigin = Content.LaserOrigin
 
 local Laser = {}
@@ -35,7 +36,46 @@ function Laser:origin(cframe: CFrame)
 end
 
 function Laser:dart(cframe: CFrame, color: Color3)
+	local dartClone = dart:Clone()
+	dartClone:PivotTo(cframe)
+
+	changeColor(dartClone, color)
+
+	local transparencyTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.TRANSPARENCY_IN, {
+		Transparency = 0,
+	})
+	local position1Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.POSITION_1, {
+		CFrame = dartClone.Root.CFrame + (dartClone.Root.CFrame.LookVector.Unit * (26 / 2)),
+		Size = Vector3.new(2, 2, 26),
+	})
+	local position2Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.POSITION_2, {
+		CFrame = dartClone.Root.CFrame + (dartClone.Root.CFrame.LookVector.Unit * (70 / 2)),
+		Size = Vector3.new(0.001, 0.001, 70),
+	})
+	local transparencyOutTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.TRANSPARENCY_OUT, {
+		Transparency = 1,
+	})
+
+	transparencyOutTween.Completed:Connect(function()
+		task.wait(5)
+		dartClone:Destroy()
+	end)
+
+	dartClone.Parent = workspace
 	
+	dartClone.Root.Charge:Play()
+	dartClone.Sphere.Beam:Play()
+		
+	transparencyTween:Play()
+	position1Tween:Play()
+	position1Tween.Completed:Connect(function()
+		position2Tween:Play()
+		position2Tween.Completed:Connect(function()
+			transparencyOutTween:Play()
+		end)
+	end)
+
+	return dartClone
 end
 
 function Laser:laser(cframe: CFrame, color: Color3)
@@ -67,17 +107,18 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	laserClone.Parent = workspace
 	
 	laserClone.Root.Charge:Play()
-	
 	laserClone.Sphere.Beam:Play()
 		
 	transparencyTween:Play()
 	position1Tween:Play()
-	position1Tween.Completed:Wait()
-	position2Tween:Play()
-	position2Tween.Completed:Wait()
-	transparencyOutTween:Play()
+	position1Tween.Completed:Connect(function()
+		position2Tween:Play()
+		position2Tween.Completed:Connect(function()
+			transparencyOutTween:Play()
+		end)
+	end)
 
-	return Laser
+	return laserClone
 end
 
 return Laser

@@ -2,7 +2,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local MAX_RETRIES = 30
 
-local function castFromMouse(raycastParams: RaycastParams, length: number, retry: boolean)
+local function castFromMouse(raycastParams: RaycastParams, length: number, retry: boolean): RaycastResult | nil
 	-- the retry logic adds the intervening part to the raycast blacklist,
 	-- and it cannot work with the whitelist filter type because sometimes
 	-- the intervening instance is a descendant of a whitelisted object and not
@@ -13,7 +13,7 @@ local function castFromMouse(raycastParams: RaycastParams, length: number, retry
 	
 	local tries = 0
 
-	local function cast(raycastParams: RaycastParams, length: number, retry: boolean)
+	local function cast()
 		tries += 1
 
 		local mouseLocation = UserInputService:GetMouseLocation()
@@ -36,26 +36,26 @@ local function castFromMouse(raycastParams: RaycastParams, length: number, retry
 					if tries == MAX_RETRIES then
 						-- if we've hit the maximum number of retries allowed, return the
 						-- cast result and don't retry
-						return raycastResult, ray
+						return raycastResult
 					else
 						-- if retries allowed, add the intervening part to the blacklist & continue
 						local newFilter = table.clone(raycastParams.FilterDescendantsInstances)
 						table.insert(newFilter, raycastResult.Instance)
 						raycastParams.FilterDescendantsInstances = newFilter
-						return cast(raycastParams, length, retry), ray
+						return cast()
 					end
 				else
-					return raycastResult, ray
+					return raycastResult
 				end
 			else
-				return raycastResult, ray
+				return raycastResult
 			end
 		else
-			return raycastResult, ray
+			return raycastResult
 		end
 	end
 
-	return cast(raycastParams, length, retry)
+	return cast()
 end
 
 return castFromMouse

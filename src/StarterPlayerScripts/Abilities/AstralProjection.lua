@@ -1,10 +1,13 @@
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
-local Utilities = script.Parent.Parent.Utilities
+local byzantiumRoot = script.Parent.Parent
+
+local Utilities = byzantiumRoot.Utilities
 local castFromMouse = require(Utilities.castFromMouse)
+local getMass = require(Utilities.getMass)
 
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
@@ -22,37 +25,57 @@ local channel = Ropost.channel("Byzantium")
 
 local isFlying = false
 
+local connection = nil
+local projectionConnections = {}
+
+local limbDragForces = {}
 local vectorForce = nil
-local supplementaryVectorForce = nil
 local alignOrientation = nil
 
-local connection = nil
-local guid = HttpService:GenerateGUID()
-
-local LIMBS = {
+local RENDER_STEP_IDENTIFIER = string.format("__%d_BYZANTIUM_ASTRAL_PROJECTION", localPlayer.UserId)
+local LIMBS_SLOWED_PHYSICS = {
 	"Left Arm",
 	"Right Arm",
 	"Left Leg",
 	"Right Leg",
-	"Torso",
-	"Head",
 }
 local CONFIGURATION = {
 	DRAG = 3,
-	FORCE = 100,
+	FORCE = 300,
 	DRAG_EXPONENT = 1.4,
+	LIMB_DRAG_EXPONENT = 2.4,
+	LIMBS_SLOWED_PHYSICS_FACTOR = 0.3,
+	GHOST_INTERVAL = 1,
 }
 
-local function getMass(instance: Instance)
-	local mass = if instance:IsA("BasePart") and not (instance:: BasePart).Massless then (instance:: BasePart):GetMass() else 0
+local PROJECTION_GHOST_WHITELISTED_CLASSES = {
+	"BasePart",
+	"Accoutrement",
+	"Attachment",
+	"Humanoid",
+	"Motor6D",
+	"VectorForce",
+}
 
-	for _, basePart in instance:GetDescendants() do
-		if basePart:IsA("BasePart") and basePart.Massless ~= true then
-			mass += basePart:GetMass()
+local TWEEN_INFO = {
+	PROJECTION_GHOST_TRANSPARENCY = TweenInfo.new(1.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+}
+
+local function processCharacterCloneForGhost(character: Model)
+	for _, descendant in character:GetDescendants() do
+		print(descendant.Name)
+
+		local isWhitelisted = false
+		for _, whitelistedClass in PROJECTION_GHOST_WHITELISTED_CLASSES do
+			if descendant:IsA(whitelistedClass) then
+				isWhitelisted = true
+			end
+		end
+
+		if not isWhitelisted then
+			descendant:Destroy()
 		end
 	end
-
-	return mass
 end
 
 local function setProjectionPhysics(enabled: boolean)
@@ -87,13 +110,14 @@ local function setProjectionPhysics(enabled: boolean)
 		humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 		workspace.Gravity = 0
 
+		-- apply the velocities of the currently playing animations to the
+		-- joints for a smoother transition
 		local motors = {}
 		for _, descendant in character:GetDescendants() do
 			if descendant:IsA("Motor6D") then
 				table.insert(motors, descendant)
 			end
 		end
-
 		animator:ApplyJointVelocities(motors)
 
 		for _, animation in animator:GetPlayingAnimationTracks() do
@@ -103,16 +127,31 @@ local function setProjectionPhysics(enabled: boolean)
 		-- slow down limb physics
 		local previousLimbCFrames = {}
 		for _, limb in character:GetDescendants() do
-			if table.find(LIMBS, limb.Name) and limb:IsA("BasePart") then
+			if table.find(LIMBS_SLOWED_PHYSICS, limb.Name) and limb:IsA("BasePart") then
 				previousLimbCFrames[limb.Name] = limb.CFrame
+
+				local attachment = Instance.new("Attachment")
+				attachment.Parent = limb
+
+				local dragVectorForce = limbDragForces[limb.Name]
+				if not dragVectorForce then
+					dragVectorForce = Instance.new("VectorForce")
+					dragVectorForce.Enabled = false
+					dragVectorForce.Force = Vector3.new(0, 0, 0)
+					dragVectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+					dragVectorForce.Attachment0 = attachment
+					dragVectorForce.Parent = limb
+
+					limbDragForces[limb.Name] = dragVectorForce
+				end
 			end
 		end
 
-		RunService:BindToRenderStep(guid, Enum.RenderPriority.Camera.Value, function()
+		RunService:BindToRenderStep(RENDER_STEP_IDENTIFIER, Enum.RenderPriority.Camera.Value, function()
 			for _, limb in character:GetDescendants() do
-				if table.find(LIMBS, limb.Name) and limb:IsA("BasePart") then
+				if table.find(LIMBS_SLOWED_PHYSICS, limb.Name) and limb:IsA("BasePart") then
 					local currentCFrame = limb.CFrame
-					limb.CFrame = previousLimbCFrames[limb.Name]:Lerp(currentCFrame, 0.3)
+					limb.CFrame = previousLimbCFrames[limb.Name]:Lerp(currentCFrame, CONFIGURATION.LIMBS_SLOWED_PHYSICS_FACTOR)
 					previousLimbCFrames[limb.Name] = limb.CFrame
 				end
 			end
@@ -152,22 +191,33 @@ local function setProjectionPhysics(enabled: boolean)
 				local dragVector = -rootPart.AssemblyLinearVelocity.Unit
 				vectorForce.Force += dragVector * CONFIGURATION.DRAG * trueCharacterMass * (rootPart.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.DRAG_EXPONENT)
 			end
+
+			-- apply a drag force to each limb
+			for _, descendant in character:GetDescendants() do
+				if descendant:IsA("BasePart") and table.find(LIMBS_SLOWED_PHYSICS, descendant.Name) then
+					local dragVectorForce = limbDragForces[descendant.Name]
+
+					if descendant.AssemblyLinearVelocity.Magnitude > 0 then
+						local dragVector = -descendant.AssemblyLinearVelocity.Unit
+						dragVectorForce.Force = dragVector * CONFIGURATION.DRAG * descendant:GetMass() * (descendant.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.LIMB_DRAG_EXPONENT)
+					end
+				end
+			end
 		end)
 	else
 		if isFlying == false then
 			return
 		end
 
-        isFlying = false
-        vectorForce.Enabled = false
-        alignOrientation.Enabled = false
-        humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-        workspace.Gravity = 196.2
-        
-        connection:Disconnect()
-        connection = nil
+		isFlying = false
+		vectorForce.Enabled = false
+		alignOrientation.Enabled = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+		workspace.Gravity = 196.2
 
-        RunService:UnbindFromRenderStep(guid)
+		connection:Disconnect()
+		connection = nil
+		RunService:UnbindFromRenderStep(RENDER_STEP_IDENTIFIER)
 	end
 end
 
@@ -192,17 +242,22 @@ channel:subscribe("astralProjectAnimation", function(data)
 		return
 	end
 
-    local user = data.user
-    local victim = data.victim
+	local user = data.user
+	local victim = data.victim
 	local fakeCharacter = data.fakeCharacter
 
-    local victimCharacter = data.victim.Character
-    if not victimCharacter then
-        return
-    end
+	local victimCharacter = data.victim.Character
+	if not victimCharacter then
+		return
+	end
 
 	local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
 	if not victimRootPart then
+		return
+	end
+
+	local victimHumanoid = victimCharacter:FindFirstChildOfClass("Humanoid")
+	if not victimHumanoid then
 		return
 	end
 
@@ -216,6 +271,60 @@ channel:subscribe("astralProjectAnimation", function(data)
 		return
 	end
 
+	victimCharacter.Archivable = true
+	local projectionGhost = victimCharacter:Clone()
+
+	local projectionGhostRootPart = projectionGhost:FindFirstChild("HumanoidRootPart")
+	if not projectionGhostRootPart then
+		print("no projection ghost root")
+		return
+	end
+
+	local projectionCloneVectorForce = Instance.new("VectorForce")
+	vectorForce.Enabled = false
+	vectorForce.Force = Vector3.new(0, 0, 0)
+	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+	vectorForce.Attachment0 = projectionGhostRootPart.RootAttachment
+	vectorForce.Parent = projectionGhostRootPart
+
+	processCharacterCloneForGhost(projectionGhost)
+
+	local elapsed = 0
+	projectionConnections[victim] = RunService.Heartbeat:Connect(function(deltaTime)
+		elapsed += deltaTime
+		if elapsed >= CONFIGURATION.GHOST_INTERVAL then
+			elapsed = 0
+
+			local projectionGhostClone = projectionGhost:Clone()
+
+			local projectionCloneRootPart = projectionGhostClone:FindFirstChild("HumanoidRootPart")
+			if not projectionCloneRootPart then
+				return
+			end
+
+			projectionGhostClone.Parent = workspace
+
+			if rootPart.AssemblyLinearVelocity.Magnitude > 0 then
+				local dragVector = -projectionCloneRootPart.AssemblyLinearVelocity.Unit
+				projectionCloneVectorForce.Force = dragVector * CONFIGURATION.DRAG * getMass(projectionGhostClone) * (projectionCloneRootPart.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.DRAG_EXPONENT)
+			end
+
+			for _, descendant in projectionGhostClone:GetDescendants() do
+				if descendant:isA("BasePart") then
+					local transparencyTween = TweenService.new(descendant, TWEEN_INFO.PROJECTION_GHOST_TRANSPARENCY, {
+						Transparency = 1
+					})
+
+					transparencyTween:Play()
+				end
+			end
+
+			task.delay(1.3, function()
+				projectionGhostClone:Destroy()
+			end)
+		end
+	end)
+
 	if localPlayer == user then
 		local animationInstance = Instance.new("Animation")
 		animationInstance.AnimationId = Animations.AstralProjectUser
@@ -223,25 +332,21 @@ channel:subscribe("astralProjectAnimation", function(data)
 		animation:Play()
 	end
 
-    if localPlayer == victim then
+	if localPlayer == victim then
 		local animationInstance = Instance.new("Animation")
 		animationInstance.AnimationId = Animations.AstralProjectVictim
 		local animation = fakeCharacterAnimator:LoadAnimation(animationInstance)
 		animation:Play()
 
-        animation:GetMarkerReachedSignal("project"):Connect(function()
-		    channel:publish("astralProjectUser", {
-			    fakeCharacter = fakeCharacter,
-		    })
-
-			local victimCharacterMass = getMass(victimCharacter)
-            setProjectionPhysics(true)
-			supplementaryVectorForce.Force += -victimRootPart.CFrame.LookVector * victimCharacterMass * 10000
-			task.delay(0.5, function()
-				supplementaryVectorForce.Force = Vector3.zero
-			end)
-	    end)
-    end
+		animation:GetMarkerReachedSignal("project"):Connect(function()
+			channel:publish("astralProjectUser", {
+				fakeCharacter = fakeCharacter,
+			})
+			victimRootPart.Anchored = false
+			victimRootPart:ApplyImpulseAtPosition(-victimRootPart.CFrame.LookVector * victimRootPart.AssemblyMass * 1000, victimRootPart.Position + victimRootPart.CFrame.LookVector * 2)
+			setProjectionPhysics(true)
+		end)
+	end
 end)
 
 local function onLocalCharacterAdded(character: Model)
@@ -262,13 +367,6 @@ local function onLocalCharacterAdded(character: Model)
 	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
 	vectorForce.Attachment0 = rootPart.RootAttachment
 	vectorForce.Parent = rootPart
-
-	supplementaryVectorForce = Instance.new("VectorForce")
-	supplementaryVectorForce.Enabled = false
-	supplementaryVectorForce.Force = Vector3.new(0, 0, 0)
-	supplementaryVectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
-	supplementaryVectorForce.Attachment0 = rootPart.RootAttachment
-	supplementaryVectorForce.Parent = rootPart
 end
 
 local AstralProjection = {}
@@ -329,13 +427,24 @@ function AstralProjection:run()
 		return
 	end
 
+	-- if the target is not on the ground, don't proceed
+	if targetHumanoid.FloorMaterial == Enum.Material.Air then
+		return
+	end
+
+	-- this is the initial signal sent immediately upon projection so the
+	-- server can handle things like anchoring the victim's root part
+	channel:publish("astralProjectInitial", {
+		victim = targetPlayer,
+	})
+
 	local targetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
 	humanoid:MoveTo(targetDestination)
 
 	local cframeChangedConnection = nil
 	cframeChangedConnection = targetRootPart:GetPropertyChangedSignal("CFrame"):Connect(function()
 		local newTargetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
-		humanoid:MoveTo(newTargetDestination.CFrame)
+		humanoid:MoveTo(newTargetDestination)
 	end)
 
 	local moveToFinishedConnection = nil
