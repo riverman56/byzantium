@@ -80,3 +80,12 @@ for _, abilityModule in Abilities:GetChildren() do
 
     ability:setup()
 end
+
+channel:subscribe("damage", function(data)
+    local humanoidsToDamage = data.humanoidsToDamage
+    local damage = data.damage
+
+    for _, humanoid in humanoidsToDamage do
+        humanoid.Health -= damage
+    end
+end)
