@@ -1,6 +1,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local byzantiumRoot = script.Parent.Parent
+
+local Utilities = byzantiumRoot.Utilities
+local validateWhitelist = require(Utilities.validateWhitelist)
+
 local replicatedStorageFolder = ReplicatedStorage.Byzantium
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
@@ -55,6 +60,29 @@ local function processDescendant(descendant: any, fakeCharacter: Model)
 	end
 end
 
+channel:subscribe("astralProjectInitial", function(data, envelope)
+	local player = envelope.player
+
+	local isWhitelisted = validateWhitelist(player)
+    if not isWhitelisted then
+        return
+    end
+
+	local victim = data.victim
+
+	local victimCharacter = victim.Character
+	if not victimCharacter then
+		return
+	end
+
+	local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
+	if not victimRootPart then
+		return
+	end
+
+	victimRootPart.Anchored = true
+end)
+
 channel:subscribe("astralProjectUser", function(data, envelope)
 	local victim = envelope.player
 	local fakeCharacter = data.fakeCharacter
@@ -91,7 +119,7 @@ channel:subscribe("astralProjectUser", function(data, envelope)
 		end
 	end
 
-    -- players cannot interact with the victim character
+    -- players cannot interact with the projection ghost
 	for _, descendant in victimCharacter:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.CollisionGroup = "ByzantiumCharacters"
@@ -121,6 +149,10 @@ channel:subscribe("astralProjectUser", function(data, envelope)
 
 	victimHumanoid.MaxHealth = math.huge
 	victimHumanoid.Health = math.huge
+
+	local fakeForcefield = Instance.new("ForceField")
+	fakeForcefield.Visible = false
+	fakeForcefield.Parent = victimCharacter
 end)
 
 channel:subscribe("astralProject", function(data, envelope)
@@ -161,7 +193,7 @@ channel:subscribe("astralProject", function(data, envelope)
 	for _, animationTrack in victimAnimator:GetPlayingAnimationTracks() do
 		animationTrack:Stop()
 	end
-
+	
 	victimRootPart.Anchored = true
 	victimHumanoid:UnequipTools()
 	victim.Backpack:ClearAllChildren()
