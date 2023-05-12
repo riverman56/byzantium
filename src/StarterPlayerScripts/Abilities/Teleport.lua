@@ -21,18 +21,25 @@ local localPlayer = Players.LocalPlayer
 
 local channel = Ropost.channel("Byzantium")
 
+local portalsFolder = workspace:FindFirstChild("BYZANTIUM_PORTALS")
+if not portalsFolder then
+    portalsFolder = Instance.new("Folder")
+    portalsFolder.Name = "BYZANTIUM_PORTALS"
+    portalsFolder.Parent = workspace
+end
+
 local Teleport = {}
+Teleport.NAME = "Teleport"
 Teleport.KEYCODE = Enum.KeyCode.T
 
-channel:subscribe("teleport", function(data)
-    local origin = data.origin
-    local destination = data.destination
+function Teleport:nonPrivilegedSetup()
+    channel:subscribe("teleport", function(data)
+        local origin = data.origin
+        local destination = data.destination
 
-    Portals.createTeleportationPortal(origin)
-    Portals.createTeleportationPortal(destination)
-end)
-
-function Teleport:setup()
+        Portals.createTeleportationPortal(origin, portalsFolder.Gateways)
+        Portals.createTeleportationPortal(destination, portalsFolder.Entrance)
+    end)
 end
 
 function Teleport:run()
@@ -46,11 +53,6 @@ function Teleport:run()
         return
     end
 
-    local result = castFromMouse(RaycastParams.new(), 2000, true)
-    if not result then
-        return
-    end
-
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid then
         return
@@ -58,6 +60,11 @@ function Teleport:run()
 
     local animator = humanoid:FindFirstChildOfClass("Animator")
     if not animator then
+        return
+    end
+
+    local result = castFromMouse(RaycastParams.new(), 2000, true)
+    if not result then
         return
     end
 
