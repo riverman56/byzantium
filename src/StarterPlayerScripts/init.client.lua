@@ -1,4 +1,5 @@
 local ContentProvider = game:GetService("ContentProvider")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -13,14 +14,23 @@ local Flipper = require(Packages.Flipper)
 local Abilities = script.Abilities
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
+
+local Constants = require(SharedAssets.Constants)
 local Configuration = require(SharedAssets.Configuration)
 
 local Content = SharedAssets.Content
 local Animations = require(Content.Animations)
 
+local SharedUtilities = SharedAssets.Utilities
+local debugPrint = require(SharedUtilities.debugPrint)
+
+local localPlayer = Players.LocalPlayer
+
 local channel = Ropost.channel("Byzantium")
 
 local rng = Random.new()
+
+local abilities = {}
 
 local SPRING_CONFIG = {
     frequency = 4,
@@ -29,11 +39,12 @@ local SPRING_CONFIG = {
 local ROTATION_TWEEN_INFO = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 local function createCube(player: Player, character: Model)
+    debugPrint(string.format("creating Byzantium cube for player \"%s\"", player.Name))
     local rootPart = character:WaitForChild("HumanoidRootPart")
 
     local offsetAttachment = Instance.new("Attachment")
     offsetAttachment.CFrame = Configuration.CUBE_OFFSET
-    offsetAttachment.Name = "BYZANTIUM_CUBE_ATTACHMENT"
+    offsetAttachment.Name = Constants.CUBE_ATTACHMENT_IDENTIFIER
     offsetAttachment.Parent = rootPart
 
     local cubeClone = SharedAssets.Cube:Clone()
@@ -43,8 +54,8 @@ local function createCube(player: Player, character: Model)
         y = offsetAttachment.WorldPosition.Y,
         z = offsetAttachment.WorldPosition.Z,
     })
-    cubeMotor:onStep(function(values)
-        cubeClone.Position = Vector3.new(values.x, values.y, values.z)
+    cubeMotor:onStep(function(position)
+        cubeClone.Position = Vector3.new(position.x, position.y, position.z)
     end)
 
     cubeClone.Hum:Play()
@@ -52,7 +63,7 @@ local function createCube(player: Player, character: Model)
     local lastPosition = offsetAttachment.WorldPosition
     local elapsed = 0
     local goal = rng:NextNumber(2, 4)
-    local connection = RunService.Heartbeat:Connect(function(deltaTime)
+    local cubeRotationConnection = RunService.Heartbeat:Connect(function(deltaTime)
         elapsed += deltaTime
         if elapsed >= goal then
             local tween = TweenService:Create(cubeClone, ROTATION_TWEEN_INFO, {
@@ -60,7 +71,7 @@ local function createCube(player: Player, character: Model)
             })
             tween:Play()
 
-            -- randomize the duration of the next tween and the time to wait
+            -- randomize the duration of the next rotation and the time to wait
             ROTATION_TWEEN_INFO = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
             goal = rng:NextNumber(2, 4)
             elapsed = 0
@@ -83,16 +94,43 @@ local function createCube(player: Player, character: Model)
                 z = Flipper.Spring.new(newPosition.Z, SPRING_CONFIG),
             })
         end
+
         lastPosition = newPosition
     end)
 
-    player.CharacterRemoving:Connect(function()
-        connection:Disconnect()
+    local characterRemovingConnection = nil
+    characterRemovingConnection = player.CharacterRemoving:Connect(function()
+        characterRemovingConnection:Disconnect()
+        characterRemovingConnection = nil
+        cubeRotationConnection:Disconnect()
+        cubeRotationConnection = nil
     end)
 end
 
-local function onSubscribe(data)
+local function onRegister(data)
     local target = data.target
+    print(string.format("received byzantium registration for %s", target.Name))
+
+    if target == localPlayer then
+        for _, ability in abilities do
+            debugPrint(string.format("running privileged setup for ability %s", ability.NAME))
+            if ability["setup"] then
+                ability:setup()
+            end
+        end
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+            if gameProcessedEvent then
+                return
+            end
+
+            local ability = abilities[input.KeyCode]
+            if ability then
+                print(string.format("running ability %s", ability.NAME))
+                ability:run()
+            end
+        end)
+    end
 
     local targetCharacter = target.Character
     if targetCharacter then
@@ -104,9 +142,8 @@ local function onSubscribe(data)
     end)
 end
 
-channel:subscribe("register", onSubscribe)
+channel:subscribe("register", onRegister)
 
-local abilities = {}
 for _, abilityModule in Abilities:GetChildren() do
     local success, ability = pcall(function()
         return require(abilityModule)
@@ -120,23 +157,19 @@ for _, abilityModule in Abilities:GetChildren() do
     abilities[ability.KEYCODE] = ability
 
     task.spawn(function()
-        ability:setup()
+        if ability["nonPrivilegedSetup"] then
+            debugPrint(string.format("running non-privileged setup for ability %s", abilityModule.Name))
+            ability:nonPrivilegedSetup()
+        end
     end)
 end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then
-        return
-    end
-
-    local ability = abilities[input.KeyCode]
-    if ability then
-        ability:run()
-    end
-end)
 
 local animationsArray = {}
 for _, animationId in Animations do
 	table.insert(animationsArray, animationId)
 end
+
+local now = os.clock()
+debugPrint("begin animation preload")
 ContentProvider:PreloadAsync(animationsArray)
+debugPrint(string.format("end animation preload: %s seconds", tostring(os.clock() - now)))
