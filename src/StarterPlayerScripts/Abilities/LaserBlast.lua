@@ -61,9 +61,10 @@ local function weld(part0: BasePart, part1: BasePart)
 end
 
 local LaserBlast = {}
+LaserBlast.NAME = "LaserBlast"
 LaserBlast.KEYCODE = Enum.KeyCode.G
 
-function LaserBlast:setup() 
+function LaserBlast:nonPrivilegedSetup() 
     channel:subscribe("laserBlast", function(data)
         local player = data.player
 
@@ -91,19 +92,6 @@ function LaserBlast:setup()
         if not animator then
             return
         end
-
-        local animationInstance = Instance.new("Animation")
-        animationInstance.AnimationId = Animations.LaserBlast
-        local animation = animator:LoadAnimation(animationInstance)
-        animation:Play()
-
-        --[[local controlPart = Instance.new("Part")
-        controlPart.Transparency = 1
-        controlPart.CanCollide = false
-        controlPart.Anchored = true
-        controlPart.Massless = true
-        controlPart.CFrame = rightArm.CFrame
-        controlPart.Parent = workspace]]
 
         local origin = Laser:origin((rightArm.CFrame + rightArm.CFrame.UpVector))
         weld(rightArm, origin.Core)
@@ -155,11 +143,21 @@ function LaserBlast:setup()
     
         origin.Cube.Attachment.Flare:Emit(10)
 
-        animation:GetMarkerReachedSignal("fire"):Connect(function()
-            animation:AdjustWeight(0.9, 0.3)
+        local laserBlastAnimationInstance = Instance.new("Animation")
+        laserBlastAnimationInstance.AnimationId = Animations.LaserBlast
+        local laserBlastAnimation = animator:LoadAnimation(laserBlastAnimationInstance)
+        laserBlastAnimation:Play()
+
+        laserBlastAnimation:GetMarkerReachedSignal("fire"):Connect(function()
+            laserBlastAnimation:AdjustWeight(0.9, 0.3)
             Laser:laser(rootPart.CFrame + rootPart.CFrame.LookVector * 2.5, Color3.fromRGB(111, 100, 255), 0)
 
             local humanoidsToDamage = HitDetection:boxInFrontOf(rootPart.CFrame, 100, 5, 6)
+            local ourHumanoid = table.find(humanoidsToDamage, humanoid)
+            if ourHumanoid then
+                table.remove(humanoidsToDamage, ourHumanoid)
+            end
+            
             if #humanoidsToDamage > 0 then
                 channel:publish("damage", {
                     humanoidsToDamage = humanoidsToDamage,
@@ -173,11 +171,11 @@ function LaserBlast:setup()
             end)
         end)
 
-        animation:GetMarkerReachedSignal("fade"):Connect(function()
-            animation:Stop(1)
+        laserBlastAnimation:GetMarkerReachedSignal("fade"):Connect(function()
+            laserBlastAnimation:Stop(1)
         end)
 
-        animation.Stopped:Connect(function()
+        laserBlastAnimation.Stopped:Connect(function()
             for _, component in origin:GetChildren() do
                 if component:IsA("BasePart") and component.Name ~= "Core" then
                     local highlight = component:FindFirstChild("Highlight")
