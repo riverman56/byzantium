@@ -1,3 +1,10 @@
+--[[
+
+	kesect, 2023
+	Clones the character and updates the Viewport to display the character.
+
+]]--
+
 local CharacterClone = {}
 CharacterClone.__index = CharacterClone
 

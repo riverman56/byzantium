@@ -5,6 +5,7 @@ local Content = script.Parent.Parent.Parent.Content
 local portal = Content.Portal
 
 local localPlayer = Players.LocalPlayer
+local Character = localPlayer.Character or localPlayer.CharacterAdded:Wait() -- only called once sorry for the bad code - luca
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local portalsFolder = workspace:FindFirstChild("BYZANTIUM_PORTALS")
@@ -47,6 +48,7 @@ local function tweenDoor(portalDoor: Part, isOpen: boolean)
             tween2:Play()
             tween2.Completed:Connect(function()
                 positionTween:Play()
+                Character:FindFirstChild("FixedBlock").Enabled = true
             end)
         end)
     else
@@ -107,6 +109,8 @@ function TeleportationPortal:close()
     contractTween.Completed:Connect(function()
         self.portal.Core.Transparency = 1
     end)
+
+    Character:FindFirstChild("FixedBlock").Enabled = false
 
     doorTween.Completed:Connect(function()
         self.portal:Destroy()

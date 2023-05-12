@@ -1,13 +1,19 @@
+--[[
+
+	kesect, 2023
+	Holds the functions which handles viewports, portals, and tieing them together.
+
+]]--
+
 local Y_SPIN = CFrame.Angles(0, math.pi, 0)
 
 local PortalClass = require(script:WaitForChild("Portal"))
 
-local function planeIntersect(point, vector, origin, normal)
+local function planeIntersect(point, vector, origin, normal) -- unused function? - luca
 	local rpoint = point - origin;
 	local t = -rpoint:Dot(normal)/vector:Dot(normal);
 	return point + t * vector, t;
 end
-
 
 local function rayPlane(p, v, o, n)
 	local r = p - o
@@ -28,10 +34,10 @@ function DualWorlds.new(character, partA, partB, surface, parent)
 	self.PortalA = PortalClass.fromPart(partA, surface, parent)
 	self.PortalB = PortalClass.fromPart(partB, surface, parent)
 	
-	self.LastCamCF = game.Workspace.CurrentCamera.CFrame
+	self.LastCamCF = workspace.CurrentCamera.CFrame
 
 	game:GetService("RunService"):BindToRenderStep("BeforeInput", Enum.RenderPriority.Input.Value - 1, function(dt)
-		game.Workspace.CurrentCamera.CFrame = self.LastCamCF
+		workspace.CurrentCamera.CFrame = self.LastCamCF
 	end)
 	
 	game:GetService("RunService"):BindToRenderStep("AfterCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
@@ -42,8 +48,8 @@ function DualWorlds.new(character, partA, partB, surface, parent)
 end
 
 function DualWorlds:CheckCameraIntersect(surface, size)
-	local camCF = game.Workspace.CurrentCamera.CFrame
-	local focusCF = game.Workspace.CurrentCamera.Focus
+	local camCF = workspace.CurrentCamera.CFrame
+	local focusCF = workspace.CurrentCamera.Focus
 	
 	local v = camCF.p - focusCF.p
 	local p, t = rayPlane(focusCF.p, camCF.p - focusCF.p, surface.p, surface.LookVector)
@@ -58,8 +64,8 @@ function DualWorlds:CheckCameraIntersect(surface, size)
 end
 
 function DualWorlds:CameraIntersectOffset(surfaceA, surfaceB)
-	local camCF = game.Workspace.CurrentCamera.CFrame
-	local focusCF = game.Workspace.CurrentCamera.Focus
+	local camCF = workspace.CurrentCamera.CFrame
+	local focusCF = workspace.CurrentCamera.Focus
 	
 	local offset = surfaceA:Inverse() * camCF
 	local newCam = surfaceB * Y_SPIN * offset
@@ -67,8 +73,8 @@ function DualWorlds:CameraIntersectOffset(surfaceA, surfaceB)
 	local offset = surfaceA:Inverse() * focusCF
 	local newFocus = surfaceB * Y_SPIN * offset
 	
-	game.Workspace.CurrentCamera.CFrame = newCam
-	game.Workspace.CurrentCamera.Focus = newFocus
+	workspace.CurrentCamera.CFrame = newCam
+	workspace.CurrentCamera.Focus = newFocus
 end
 
 function DualWorlds:InfrontOf(pos, surface, size)
@@ -90,7 +96,7 @@ end
 
 function DualWorlds:MoveToPortal(surfaceA, surfaceB)
 	local hrpCF = self.HRP.CFrame
-	local camCF = game.Workspace.CurrentCamera.CFrame
+	local camCF = workspace.CurrentCamera.CFrame
 	local velocity = self.HRP.Velocity
 	local moveDir = self.Humanoid.MoveDirection
 	
@@ -121,7 +127,7 @@ function DualWorlds:OnRenderStep(dt)
 	
 	-- collision check
 	
-	self.LastCamCF = game.Workspace.CurrentCamera.CFrame
+	self.LastCamCF = workspace.CurrentCamera.CFrame
 	
 	if (self:CheckCollision(surfaceA, sizeA, dt)) then
 		self.LastCamCF = self:MoveToPortal(surfaceA, surfaceB)
@@ -139,7 +145,7 @@ function DualWorlds:OnRenderStep(dt)
 	
 	-- render portal
 	
-	local camCF = game.Workspace.CurrentCamera.CFrame
+	local camCF = workspace.CurrentCamera.CFrame
 	
 	local offset = surfaceA:Inverse() * camCF
 	local newCamCF = surfaceB * Y_SPIN * offset
