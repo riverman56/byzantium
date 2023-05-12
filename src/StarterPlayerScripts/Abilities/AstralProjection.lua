@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local byzantiumRoot = script.Parent.Parent
 
@@ -11,26 +10,38 @@ local getMass = require(Utilities.getMass)
 
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
+local Packages = replicatedStorageFolder.Packages
+local Ropost = require(Packages.Ropost)
+
 local SharedAssets = replicatedStorageFolder.SharedAssets
+
+local Constants = require(SharedAssets.Constants)
 
 local Content = SharedAssets.Content
 local Animations = require(Content.Animations)
 
-local Packages = replicatedStorageFolder.Packages
-local Ropost = require(Packages.Ropost)
+local Modules = SharedAssets.Modules
+local TopbarPlus = require(Modules.TopbarPlus)
+
+local fakeCharactersFolder = workspace:WaitForChild(Constants.FAKE_CHARACTERS_FOLDER_IDENTIFIER)
 
 local localPlayer = Players.LocalPlayer
-
 local channel = Ropost.channel("Byzantium")
 
 local isFlying = false
 
 local connection = nil
-local projectionConnections = {}
 
 local limbDragForces = {}
 local vectorForce = nil
 local alignOrientation = nil
+
+local unprojectIcon = TopbarPlus.new()
+unprojectIcon:setRight()
+unprojectIcon:setLabel("[Q] Leave Astral Dimension")
+unprojectIcon:setImage("rbxassetid://13350796392")
+unprojectIcon:setEnabled(false)
+unprojectIcon:bindToggleKey(Enum.KeyCode.Q)
 
 local RENDER_STEP_IDENTIFIER = string.format("__%d_BYZANTIUM_ASTRAL_PROJECTION", localPlayer.UserId)
 local LIMBS_SLOWED_PHYSICS = {
@@ -46,37 +57,8 @@ local CONFIGURATION = {
 	LIMB_DRAG_EXPONENT = 2.4,
 	LIMBS_SLOWED_PHYSICS_FACTOR = 0.3,
 	GHOST_INTERVAL = 1,
+	ALIGN_ORIENTATION_RESPONSIVENESS = 180,
 }
-
-local PROJECTION_GHOST_WHITELISTED_CLASSES = {
-	"BasePart",
-	"Accoutrement",
-	"Attachment",
-	"Humanoid",
-	"Motor6D",
-	"VectorForce",
-}
-
-local TWEEN_INFO = {
-	PROJECTION_GHOST_TRANSPARENCY = TweenInfo.new(1.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-}
-
-local function processCharacterCloneForGhost(character: Model)
-	for _, descendant in character:GetDescendants() do
-		print(descendant.Name)
-
-		local isWhitelisted = false
-		for _, whitelistedClass in PROJECTION_GHOST_WHITELISTED_CLASSES do
-			if descendant:IsA(whitelistedClass) then
-				isWhitelisted = true
-			end
-		end
-
-		if not isWhitelisted then
-			descendant:Destroy()
-		end
-	end
-end
 
 local function setProjectionPhysics(enabled: boolean)
 	local character = localPlayer.Character
@@ -104,6 +86,7 @@ local function setProjectionPhysics(enabled: boolean)
 			return
 		end
 
+		unprojectIcon:setEnabled(true)
 		isFlying = true
 		vectorForce.Enabled = true
 		alignOrientation.Enabled = true
@@ -147,7 +130,7 @@ local function setProjectionPhysics(enabled: boolean)
 			end
 		end
 
-		RunService:BindToRenderStep(RENDER_STEP_IDENTIFIER, Enum.RenderPriority.Camera.Value, function()
+		RunService:BindToRenderStep(RENDER_STEP_IDENTIFIER, Enum.RenderPriority.Camera.Value - 1, function()
 			for _, limb in character:GetDescendants() do
 				if table.find(LIMBS_SLOWED_PHYSICS, limb.Name) and limb:IsA("BasePart") then
 					local currentCFrame = limb.CFrame
@@ -209,6 +192,7 @@ local function setProjectionPhysics(enabled: boolean)
 			return
 		end
 
+		unprojectIcon:setEnabled(false)
 		isFlying = false
 		vectorForce.Enabled = false
 		alignOrientation.Enabled = false
@@ -221,7 +205,79 @@ local function setProjectionPhysics(enabled: boolean)
 	end
 end
 
-channel:subscribe("astralProjectAnimation", function(data)
+--[[
+	effects that run on the victim's client when a keyframe marker is reached
+	in the victim's projection animation
+]]
+local function onVictimAnimationPlayed(animationTrack: AnimationTrack, fakeCharacter: Model)
+	local character = localPlayer.Character
+	if not character then
+		return
+	end
+
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		return
+	end
+
+	animationTrack:GetMarkerReachedSignal("project"):Connect(function()
+		channel:publish("astralProjectPunch", {
+			fakeCharacter = fakeCharacter,
+		})
+
+		rootPart.Anchored = false
+		rootPart:ApplyImpulseAtPosition(-rootPart.CFrame.LookVector * rootPart.AssemblyMass * 100, rootPart.Position + rootPart.CFrame.LookVector * 2)
+		setProjectionPhysics(true)
+	end)
+end
+
+--[[
+	this is nauseous logic that has to be written this specific way to ensure
+	that the timing of all effects is consistent across all clients
+
+	the projection animations are played on the server to ensure that they are
+	in sync for all clients, and that means that we have to listen for the
+	specific animation on the client
+
+	if this client is the victim of this projection, we need to handle effects
+	when a specific keyframe marker is reached
+]]
+fakeCharactersFolder.ChildAdded:Connect(function(fakeCharacter)
+	print(string.format("fake character %s added", fakeCharacter.Name))
+	-- rudimentary class check just in case something unexpected ends up in the
+	-- folder
+	if fakeCharacter:IsA("Model") then
+		local matchingPlayer = Players:FindFirstChild(fakeCharacter.Name)
+		print(string.format("matching player for fake character %s: %s", fakeCharacter.Name, if matchingPlayer then matchingPlayer.Name else "nil"))
+
+		if matchingPlayer == localPlayer then
+			print("the matching player is the local player")
+			local fakeCharacterHumanoid = fakeCharacter:WaitForChild("Humanoid")
+			local fakeCharacterAnimator = fakeCharacterHumanoid:WaitForChild("Animator")
+
+			fakeCharacterAnimator.AnimationPlayed:Connect(function(animationTrack)
+				print("animation played on our fake character")
+				if animationTrack.Animation.AnimationId == Animations.AstralProjectVictim then
+					print("the animation being played is the victim animation. we are being astral projected and are handling the victim's client logic")
+					onVictimAnimationPlayed(animationTrack, fakeCharacter)
+				end
+			end)
+			-- we still want to handle in case the animation is already playing
+			for _, animationTrack in fakeCharacterAnimator:GetPlayingAnimationTracks() do
+				if animationTrack.Animation.AnimationId == Animations.AstralProjectVictim then
+					print("the animation being played is the victim animation. we are being astral projected and are handling the victim's client logic")
+					onVictimAnimationPlayed(animationTrack, fakeCharacter)
+				end
+			end
+		end
+	end
+end)
+
+unprojectIcon.toggled:Connect(function()
+	if not unprojectIcon.enabled then
+		return
+	end
+
 	local character = localPlayer.Character
 	if not character then
 		return
@@ -237,116 +293,12 @@ channel:subscribe("astralProjectAnimation", function(data)
 		return
 	end
 
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if not animator then
-		return
-	end
-
-	local user = data.user
-	local victim = data.victim
-	local fakeCharacter = data.fakeCharacter
-
-	local victimCharacter = data.victim.Character
-	if not victimCharacter then
-		return
-	end
-
-	local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
-	if not victimRootPart then
-		return
-	end
-
-	local victimHumanoid = victimCharacter:FindFirstChildOfClass("Humanoid")
-	if not victimHumanoid then
-		return
-	end
-
-	local fakeCharacterHumanoid = fakeCharacter:FindFirstChildOfClass("Humanoid")
-	if not fakeCharacterHumanoid then
-		return
-	end
-
-	local fakeCharacterAnimator = fakeCharacterHumanoid:FindFirstChildOfClass("Animator")
-	if not fakeCharacterAnimator then
-		return
-	end
-
-	victimCharacter.Archivable = true
-	local projectionGhost = victimCharacter:Clone()
-
-	local projectionGhostRootPart = projectionGhost:FindFirstChild("HumanoidRootPart")
-	if not projectionGhostRootPart then
-		print("no projection ghost root")
-		return
-	end
-
-	local projectionCloneVectorForce = Instance.new("VectorForce")
-	vectorForce.Enabled = false
-	vectorForce.Force = Vector3.new(0, 0, 0)
-	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
-	vectorForce.Attachment0 = projectionGhostRootPart.RootAttachment
-	vectorForce.Parent = projectionGhostRootPart
-
-	processCharacterCloneForGhost(projectionGhost)
-
-	local elapsed = 0
-	projectionConnections[victim] = RunService.Heartbeat:Connect(function(deltaTime)
-		elapsed += deltaTime
-		if elapsed >= CONFIGURATION.GHOST_INTERVAL then
-			elapsed = 0
-
-			local projectionGhostClone = projectionGhost:Clone()
-
-			local projectionCloneRootPart = projectionGhostClone:FindFirstChild("HumanoidRootPart")
-			if not projectionCloneRootPart then
-				return
-			end
-
-			projectionGhostClone.Parent = workspace
-
-			if rootPart.AssemblyLinearVelocity.Magnitude > 0 then
-				local dragVector = -projectionCloneRootPart.AssemblyLinearVelocity.Unit
-				projectionCloneVectorForce.Force = dragVector * CONFIGURATION.DRAG * getMass(projectionGhostClone) * (projectionCloneRootPart.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.DRAG_EXPONENT)
-			end
-
-			for _, descendant in projectionGhostClone:GetDescendants() do
-				if descendant:isA("BasePart") then
-					local transparencyTween = TweenService.new(descendant, TWEEN_INFO.PROJECTION_GHOST_TRANSPARENCY, {
-						Transparency = 1
-					})
-
-					transparencyTween:Play()
-				end
-			end
-
-			task.delay(1.3, function()
-				projectionGhostClone:Destroy()
-			end)
-		end
+	task.spawn(function()
+		--humanoid:ApplyDescription(Players:GetHumanoidDescriptionFromUserId(localPlayer.UserId))
 	end)
 
-	if localPlayer == user then
-		local animationInstance = Instance.new("Animation")
-		animationInstance.AnimationId = Animations.AstralProjectUser
-		local animation = animator:LoadAnimation(animationInstance)
-		animation:Play()
-	end
-
-	if localPlayer == victim then
-		local animationInstance = Instance.new("Animation")
-		animationInstance.AnimationId = Animations.AstralProjectVictim
-		local animation = fakeCharacterAnimator:LoadAnimation(animationInstance)
-		animation:Play()
-
-		animation:GetMarkerReachedSignal("project"):Connect(function()
-			channel:publish("astralProjectUser", {
-				fakeCharacter = fakeCharacter,
-			})
-			victimRootPart.Anchored = false
-			victimRootPart:ApplyImpulseAtPosition(-victimRootPart.CFrame.LookVector * victimRootPart.AssemblyMass * 1000, victimRootPart.Position + victimRootPart.CFrame.LookVector * 2)
-			setProjectionPhysics(true)
-		end)
-	end
+	setProjectionPhysics(false)
+	channel:publish("astralProjectStop", {})
 end)
 
 local function onLocalCharacterAdded(character: Model)
@@ -357,7 +309,7 @@ local function onLocalCharacterAdded(character: Model)
 	alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	alignOrientation.MaxTorque = math.huge
 	alignOrientation.MaxAngularVelocity = math.huge
-	alignOrientation.Responsiveness = 180
+	alignOrientation.Responsiveness = CONFIGURATION.ALIGN_ORIENTATION_RESPONSIVENESS
 	alignOrientation.Attachment0 = rootPart.RootAttachment
 	alignOrientation.Parent = rootPart
 
@@ -370,14 +322,18 @@ local function onLocalCharacterAdded(character: Model)
 end
 
 local AstralProjection = {}
+AstralProjection.NAME = "AstralProjection"
 AstralProjection.KEYCODE = Enum.KeyCode.F
 
-function AstralProjection:setup()
+function AstralProjection:nonPrivilegedSetup()
 	local character = localPlayer.Character
 	if character then
 		onLocalCharacterAdded(character)
 	end
 	localPlayer.CharacterAdded:Connect(onLocalCharacterAdded)
+end
+
+function AstralProjection:setup()
 end
 
 function AstralProjection:run()
@@ -427,13 +383,12 @@ function AstralProjection:run()
 		return
 	end
 
-	-- if the target is not on the ground, don't proceed
-	if targetHumanoid.FloorMaterial == Enum.Material.Air then
+	if targetHumanoid.FloorMaterial == Enum.Material.Air or targetHumanoid.Health == 0 then
 		return
 	end
 
 	-- this is the initial signal sent immediately upon projection so the
-	-- server can handle things like anchoring the victim's root part
+	-- server can handle effects like anchoring the victim's root part
 	channel:publish("astralProjectInitial", {
 		victim = targetPlayer,
 	})
@@ -461,6 +416,7 @@ function AstralProjection:run()
 		cframeChangedConnection = nil
 
 		rootPart.CFrame = CFrame.lookAt(rootPart.Position, targetRootPart.Position)
+		rootPart.Anchored = true
 
 		channel:publish("astralProject", {
 			victim = targetPlayer,

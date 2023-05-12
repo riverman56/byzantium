@@ -10,8 +10,11 @@ local replicatedStorageFolder = ReplicatedStorage.Byzantium
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
+local Constants = require(SharedAssets.Constants)
+
 local Content = SharedAssets.Content
 local Shards = Content.Shards
+local Animations = require(Content.Animations)
 
 local Modules = SharedAssets.Modules
 local Ragdoll = require(Modules.Ragdoll)
@@ -21,10 +24,10 @@ local Ropost = require(Packages.Ropost)
 
 local channel = Ropost.channel("Byzantium")
 
-local AstralProjection = {}
+local fakeCharactersFolder = nil
 
 local function processDescendant(descendant: any, fakeCharacter: Model)
-	if descendant:IsA("Decal") or (descendant:IsA("Accessory") and (descendant.AccessoryType ~= Enum.AccessoryType.Hat or descendant.AccessoryType ~= Enum.AccessoryType.Hair)) or descendant:IsA("Shirt") or descendant:IsA("Pants") then
+	if descendant:IsA("Decal") or (descendant:IsA("Accessory") and (descendant.AccessoryType ~= Enum.AccessoryType.Hat or descendant.AccessoryType ~= Enum.AccessoryType.Hair)) or descendant:IsA("Shirt") or descendant:IsA("Pants") or descendant:IsA("LuaSourceContainer") then
 		descendant:Destroy()
 	elseif descendant:IsA("BasePart") then
 		descendant.CanCollide = false
@@ -60,6 +63,7 @@ local function processDescendant(descendant: any, fakeCharacter: Model)
 	end
 end
 
+-- privileged endpoint
 channel:subscribe("astralProjectInitial", function(data, envelope)
 	local player = envelope.player
 
@@ -83,7 +87,19 @@ channel:subscribe("astralProjectInitial", function(data, envelope)
 	victimRootPart.Anchored = true
 end)
 
-channel:subscribe("astralProjectUser", function(data, envelope)
+-- non-privileged endpoint
+channel:subscribe("astralProjectStop", function(_, envelope)
+	local player = envelope.player
+	
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	Ragdoll:setRagdoll(character, false)
+end)
+
+channel:subscribe("astralProjectPunch", function(data, envelope)
 	local victim = envelope.player
 	local fakeCharacter = data.fakeCharacter
 
@@ -126,6 +142,8 @@ channel:subscribe("astralProjectUser", function(data, envelope)
 		end
 	end
 
+	-- apply this small impulse so the character will fall to the floor when
+	-- they ragdoll
 	fakeCharacterRootPart:SetNetworkOwner(nil)
     fakeCharacterRootPart:ApplyImpulseAtPosition(-fakeCharacterRootPart.CFrame.LookVector * fakeCharacterRootPart.AssemblyMass * 5, fakeCharacterRootPart.Position + fakeCharacterRootPart.CFrame.LookVector * 2)
 
@@ -162,6 +180,10 @@ channel:subscribe("astralProject", function(data, envelope)
 	if not character then
 		return
 	end
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		return
+	end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
 		return
@@ -194,19 +216,22 @@ channel:subscribe("astralProject", function(data, envelope)
 		animationTrack:Stop()
 	end
 	
-	victimRootPart.Anchored = true
 	victimHumanoid:UnequipTools()
 	victim.Backpack:ClearAllChildren()
 
-	local victimClone = Players:CreateHumanoidModelFromDescription(victimHumanoid:GetAppliedDescription(), Enum.HumanoidRigType.R6)
-	victimClone.Name = victim.Name
+	local fakeVictimCharacter = Players:CreateHumanoidModelFromDescription(victimHumanoid:GetAppliedDescription(), Enum.HumanoidRigType.R6)
+	fakeVictimCharacter.Name = victim.Name
 
-	local victimCloneRootPart = victimClone:FindFirstChild("HumanoidRootPart")
+	local fakeVictimRootPart = fakeVictimCharacter:FindFirstChild("HumanoidRootPart")
+
+	local fakeVictimHumanoid = fakeVictimCharacter:FindFirstChildOfClass("Humanoid")
+	local fakeVictimAnimator = fakeVictimHumanoid:FindFirstChildOfClass("Animator")
 
 	--replace the victim's character with the fake one
-	victimCloneRootPart.CFrame = victimRootPart.CFrame
-	victimClone.Parent = workspace
+	fakeVictimRootPart.CFrame = victimRootPart.CFrame
+	fakeVictimCharacter.Parent = fakeCharactersFolder
 
+	-- make the original character invisible momentarily
 	for _, descendant in victimCharacter:GetDescendants() do
 		if descendant:IsA("BasePart") or descendant:IsA("Decal") then
 			descendant.Transparency = 1
@@ -215,14 +240,28 @@ channel:subscribe("astralProject", function(data, envelope)
 		end
 	end
 
-	channel:publish("astralProjectAnimation", {
-		user = player,
-		victim = victim,
-		fakeCharacter = victimClone,
-	}, Players:GetPlayers())
+	local victimAnimationInstance = Instance.new("Animation")
+	victimAnimationInstance.AnimationId = Animations.AstralProjectVictim
+	local victimAnimation = fakeVictimAnimator:LoadAnimation(victimAnimationInstance)
+
+	local userAnimationInstance = Instance.new("Animation")
+	userAnimationInstance.AnimationId = Animations.AstralProjectUser
+	local userAnimation = animator:LoadAnimation(userAnimationInstance)
+	
+	victimAnimation:Play()
+	userAnimation:Play()
+
+	userAnimation.Ended:Connect(function()
+		rootPart.Anchored = false
+	end)
 end)
 
+local AstralProjection = {}
+
 function AstralProjection:setup()
+	fakeCharactersFolder = Instance.new("Folder")
+	fakeCharactersFolder.Name = Constants.FAKE_CHARACTERS_FOLDER_IDENTIFIER
+	fakeCharactersFolder.Parent = workspace
 end
 
 return AstralProjection
