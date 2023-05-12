@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 
 -- distribute content to its proper location before referencing anything
 local Utilities = script.Utilities
@@ -9,8 +8,10 @@ distribute()
 
 local Abilities = script.Abilities
 
-local ServerAssets = ServerStorage.Byzantium.ServerAssets
 local SharedAssets = ReplicatedStorage.Byzantium.SharedAssets
+
+local SharedUtilities = SharedAssets.Utilities
+local debugPrint = require(SharedUtilities.debugPrint)
 
 local Modules = SharedAssets.Modules
 local Ragdoll = require(Modules.Ragdoll)
@@ -41,6 +42,7 @@ local function onPlayerAdded(player: Player)
     local isWhitelisted = table.find(Whitelist, player.UserId)
 
     if isWhitelisted then
+        debugPrint(string.format("registering Byzantium user %s", player.Name))
         channel:publish("register", {
             target = player,
         })
@@ -78,6 +80,7 @@ for _, abilityModule in Abilities:GetChildren() do
         continue
     end
 
+    debugPrint(string.format("running setup on ability %s", abilityModule.Name))
     ability:setup()
 end
 
