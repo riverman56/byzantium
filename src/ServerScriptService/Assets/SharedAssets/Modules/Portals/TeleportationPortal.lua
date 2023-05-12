@@ -39,6 +39,8 @@ local function tweenDoor(portalDoor: Part, isOpen: boolean)
         Position = if isOpen then (portalDoor:FindFirstChild("Goal"):: Attachment).WorldPosition else (portalDoor:FindFirstChild("Origin"):: Attachment).WorldPosition,
     })
 
+    local finalTween = tween2
+
     if isOpen == true then
         tween1:Play()
         tween1.Completed:Connect(function()
@@ -52,6 +54,8 @@ local function tweenDoor(portalDoor: Part, isOpen: boolean)
             Size = Vector3.new(6, 0, 0),
         })
 
+        finalTween = tween3
+
         positionTween:Play()
         positionTween.Completed:Connect(function()
             tween1:Play()
@@ -60,14 +64,16 @@ local function tweenDoor(portalDoor: Part, isOpen: boolean)
             end)
         end)
     end
+
+    return finalTween
 end
 
-function TeleportationPortal.new(cframe: CFrame)
+function TeleportationPortal.new(cframe: CFrame, parent: Instance)
     local self = setmetatable({}, TeleportationPortal)
 
     self.portal = portal:Clone()
     self.portal:PivotTo(cframe)
-    self.portal.Parent = portalsFolder.Gateways
+    self.portal.Parent = parent
     
     self:open()
     task.delay(5, function()
@@ -81,24 +87,35 @@ function TeleportationPortal:open()
     })
 
     tweenDoor(self.portal.Left, true)
-    tweenDoor(self.portal.Right, true)
+    local doorTween = tweenDoor(self.portal.Right, true)
 
-    task.delay(0.7, function()
+    doorTween.Completed:Connect(function()
         self.portal.Core.Transparency = 0
         expandTween:Play()
     end)
 end
 
 function TeleportationPortal:close()
-    tweenDoor(self.portal.Left, false)
-    tweenDoor(self.portal.Right, false)
+    local contractTween = TweenService:Create(self.portal.Core, TWEEN_INFO.POSITION, {
+        Size = Vector3.new(0, 9, 2),
+    })
 
-    self.portal:Destroy()
-    for _, viewportFrame in playerGui:GetChildren() do
-        if viewportFrame.Name == "PortalViewport" then
-            viewportFrame:Destroy()
+    tweenDoor(self.portal.Left, false)
+    local doorTween = tweenDoor(self.portal.Right, false)
+    contractTween:Play()
+
+    contractTween.Completed:Connect(function()
+        self.portal.Core.Transparency = 1
+    end)
+
+    doorTween.Completed:Connect(function()
+        self.portal:Destroy()
+        for _, viewportFrame in playerGui:GetChildren() do
+            if viewportFrame.Name == "PortalViewport" then
+                viewportFrame:Destroy()
+            end
         end
-    end
+    end)
 end
 
 return TeleportationPortal

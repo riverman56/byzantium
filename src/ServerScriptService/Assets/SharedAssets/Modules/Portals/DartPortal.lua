@@ -1,11 +1,7 @@
-local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local Content = script.Parent.Parent.Parent.Content
 local dartPortal = Content.DartPortal
-
-local localPlayer = Players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local portalsFolder = workspace:FindFirstChild("BYZANTIUM_PORTALS")
 if not portalsFolder then
@@ -42,6 +38,8 @@ local function tween(portal: Part, isOpen: boolean)
         OutlineTransparency = if isOpen then 0 else 1,
     })
 
+    local finalTween = tween2
+
     if isOpen == true then
         tween1:Play()
         highlightTween:Play()
@@ -52,6 +50,7 @@ local function tween(portal: Part, isOpen: boolean)
         local tween3 = TweenService:Create(portal, TWEEN_INFO.EXPAND1, {
             Size = Vector3.new(4, 0, 0),
         })
+        finalTween = tween3
 
         tween1:Play()
         tween1.Completed:Connect(function()
@@ -59,6 +58,8 @@ local function tween(portal: Part, isOpen: boolean)
             highlightTween:Play()
         end)
     end
+
+    return finalTween
 end
 
 function DartPortal.new(cframe: CFrame)
@@ -76,15 +77,10 @@ function DartPortal:open()
 end
 
 function DartPortal:close()
-    tween(self.portal, false)
+    local closeTween = tween(self.portal, false)
 
-    task.delay(0.7, function()
+    closeTween.Completed:Connect(function()
         self.portal:Destroy()
-        for _, viewportFrame in playerGui:GetChildren() do
-            if viewportFrame.Name == "PortalViewport" then
-                viewportFrame:Destroy()
-            end
-        end
     end)
 end
 
