@@ -215,6 +215,9 @@ channel:subscribe("astralProject", function(data, envelope)
 	for _, animationTrack in victimAnimator:GetPlayingAnimationTracks() do
 		animationTrack:Stop()
 	end
+
+	victimCharacter:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER, true)
+	character:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER, true)
 	
 	victimHumanoid:UnequipTools()
 	victim.Backpack:ClearAllChildren()
@@ -251,8 +254,49 @@ channel:subscribe("astralProject", function(data, envelope)
 	victimAnimation:Play()
 	userAnimation:Play()
 
-	userAnimation.Ended:Connect(function()
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://13421836099"
+	sound.Volume = 7
+	sound.Parent = fakeVictimRootPart
+	sound:Play()
+
+	userAnimation.Stopped:Connect(function()
+		print("user animation ended")
 		rootPart.Anchored = false
+		character:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER, false)
+	end)
+end)
+
+channel:subscribe("unproject", function(data, envelope)
+	local player = envelope.player
+
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		return
+	end
+
+	local fakeCharacter = data.fakeCharacter
+
+	local fakeRootPart = fakeCharacter:FindFirstChild("HumanoidRootPart")
+	if not fakeRootPart then
+		return
+	end
+
+	--character:Destroy()
+
+	channel:publish("unproject", {
+		target = player,
+		origin = rootPart.Position,
+		destination = fakeRootPart.Position,
+	}, Players:GetPlayers())
+
+	task.delay(5, function()
+		fakeCharacter:Destroy()
 	end)
 end)
 

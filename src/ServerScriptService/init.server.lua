@@ -42,7 +42,7 @@ local function onPlayerAdded(player: Player)
     local isWhitelisted = table.find(Whitelist, player.UserId)
 
     if isWhitelisted then
-        debugPrint(string.format("registering Byzantium user %s", player.Name))
+        debugPrint(string.format("registering Byzantium user \"%s\"", player.Name))
         channel:publish("register", {
             target = player,
         })
@@ -76,11 +76,11 @@ for _, abilityModule in Abilities:GetChildren() do
     end)
     
     if not success then
-        warn(string.format("Error requiring ability module %s: %s", abilityModule.Name, ability))
+        warn(string.format("Error requiring ability module \"%s\": %s", abilityModule.Name, ability))
         continue
     end
 
-    debugPrint(string.format("running setup on ability %s", abilityModule.Name))
+    debugPrint(string.format("running setup on ability \"%s\"", abilityModule.Name))
     ability:setup()
 end
 
@@ -91,4 +91,24 @@ channel:subscribe("damage", function(data)
     for _, humanoid in humanoidsToDamage do
         humanoid.Health -= damage
     end
+end)
+
+channel:subscribe("refresh", function(data, envelope)
+    local player = envelope.player
+
+    local character = player.Character
+    if not character then
+        player:LoadCharacter()
+        return
+    end
+
+    player:LoadCharacter()
+    local newCharacter = player.Character
+    if not newCharacter then
+        player.CharacterAdded:Wait()
+        newCharacter = player.Character
+    end
+
+    local newRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    newRootPart.CFrame = data.cframe
 end)

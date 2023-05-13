@@ -11,6 +11,17 @@ local TWEEN_INFO = {
 	TIME_SCALE = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
 }
 
+local TWEEN_INFO_DART = {
+	TRANSPARENCY_IN = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+	SIZE_IN = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	POSITION_1 = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	POSITION_2 = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	
+	TRANSPARENCY_OUT = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+	
+	TIME_SCALE = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+}
+
 local Content = script.Parent.Parent.Content
 local laser = Content.Laser
 local dart = Content.Dart
@@ -32,6 +43,8 @@ function Laser:origin(cframe: CFrame)
 	local originClone = laserOrigin:Clone()
 	originClone:PivotTo(cframe)
 
+	originClone.Core.Charge:Play()
+
 	return originClone
 end
 
@@ -41,18 +54,18 @@ function Laser:dart(cframe: CFrame, color: Color3)
 
 	changeColor(dartClone, color)
 
-	local transparencyTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.TRANSPARENCY_IN, {
+	local transparencyTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO_DART.TRANSPARENCY_IN, {
 		Transparency = 0,
 	})
-	local position1Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.POSITION_1, {
+	local position1Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO_DART.POSITION_1, {
 		CFrame = dartClone.Root.CFrame + (dartClone.Root.CFrame.LookVector.Unit * (26 / 2)),
 		Size = Vector3.new(2, 2, 26),
 	})
-	local position2Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.POSITION_2, {
+	local position2Tween = TweenService:Create(dartClone.Sphere, TWEEN_INFO_DART.POSITION_2, {
 		CFrame = dartClone.Root.CFrame + (dartClone.Root.CFrame.LookVector.Unit * (70 / 2)),
 		Size = Vector3.new(0.001, 0.001, 70),
 	})
-	local transparencyOutTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO.TRANSPARENCY_OUT, {
+	local transparencyOutTween = TweenService:Create(dartClone.Sphere, TWEEN_INFO_DART.TRANSPARENCY_OUT, {
 		Transparency = 1,
 	})
 
@@ -63,8 +76,7 @@ function Laser:dart(cframe: CFrame, color: Color3)
 
 	dartClone.Parent = workspace
 	
-	dartClone.Root.Charge:Play()
-	dartClone.Sphere.Beam:Play()
+	--dartClone.Sphere.Fire:Play()
 		
 	transparencyTween:Play()
 	position1Tween:Play()
@@ -105,9 +117,8 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	end)
 
 	laserClone.Parent = workspace
-	
-	laserClone.Root.Charge:Play()
-	laserClone.Sphere.Beam:Play()
+
+	laserClone.Sphere.Fire:Play()
 		
 	transparencyTween:Play()
 	position1Tween:Play()

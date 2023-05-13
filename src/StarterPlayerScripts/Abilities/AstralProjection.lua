@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local byzantiumRoot = script.Parent.Parent
 
@@ -11,13 +12,18 @@ local getMass = require(Utilities.getMass)
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
 local Packages = replicatedStorageFolder.Packages
+local Flipper = require(Packages.Flipper)
 local Ropost = require(Packages.Ropost)
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
+local SharedUtilities = SharedAssets.Utilities
+local getFakeProjectionCharacter = require(SharedUtilities.getFakeProjectionCharacter)
+
 local Constants = require(SharedAssets.Constants)
 
 local Content = SharedAssets.Content
+local ProjectionOrb = Content.ProjectionOrb
 local Animations = require(Content.Animations)
 
 local Modules = SharedAssets.Modules
@@ -58,6 +64,16 @@ local CONFIGURATION = {
 	LIMBS_SLOWED_PHYSICS_FACTOR = 0.3,
 	GHOST_INTERVAL = 1,
 	ALIGN_ORIENTATION_RESPONSIVENESS = 180,
+}
+local TWEEN_INFO = {
+	PROJECTION_ORB_POSITION = TweenInfo.new(1.8, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut),
+	PROJECTION_ORB_TRANSPARENCY = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+}
+local SPRING_CONFIG = {
+	CHARACTER_SCALE = {
+		frequency = 3,
+		dampingRatio = 1,
+	},
 }
 
 local function setProjectionPhysics(enabled: boolean)
@@ -226,7 +242,7 @@ local function onVictimAnimationPlayed(animationTrack: AnimationTrack, fakeChara
 		})
 
 		rootPart.Anchored = false
-		rootPart:ApplyImpulseAtPosition(-rootPart.CFrame.LookVector * rootPart.AssemblyMass * 100, rootPart.Position + rootPart.CFrame.LookVector * 2)
+		rootPart:ApplyImpulseAtPosition(-rootPart.CFrame.LookVector * rootPart.AssemblyMass * 200, rootPart.Position + rootPart.CFrame.LookVector * 2)
 		setProjectionPhysics(true)
 	end)
 end
@@ -293,9 +309,19 @@ unprojectIcon.toggled:Connect(function()
 		return
 	end
 
-	task.spawn(function()
-		--humanoid:ApplyDescription(Players:GetHumanoidDescriptionFromUserId(localPlayer.UserId))
-	end)
+	-- if for some reason the fake character no longer exists, create a
+	-- fallback that still allows us to leave the astral dimension
+	local fakeCharacter = getFakeProjectionCharacter()
+	if not fakeCharacter then
+		channel:publish("refresh", {
+			cframe = rootPart.CFrame,
+		})
+		return
+	end
+
+	channel:publish("unproject", {
+		fakeCharacter = fakeCharacter,
+	})
 
 	setProjectionPhysics(false)
 	channel:publish("astralProjectStop", {})
@@ -331,6 +357,81 @@ function AstralProjection:nonPrivilegedSetup()
 		onLocalCharacterAdded(character)
 	end
 	localPlayer.CharacterAdded:Connect(onLocalCharacterAdded)
+
+	channel:subscribe("unproject", function(data)
+		local target = data.target
+		local origin = data.origin
+		local destination = data.destination
+
+		local targetCharacter = target.Character
+		if not targetCharacter then
+			return
+		end
+
+		local projectionOrbClone = ProjectionOrb:Clone()
+		projectionOrbClone.Position = origin
+
+		local oldSize = projectionOrbClone.Size
+		projectionOrbClone.Size = Vector3.new(0, 0, 0)
+
+		projectionOrbClone.Parent = workspace
+
+		projectionOrbClone.Attachment.Pulse:Emit(2)
+
+		local orbTween = TweenService:Create(projectionOrbClone, TWEEN_INFO.PROJECTION_ORB_POSITION, {
+			Position = destination,
+		})
+
+		local scaleTween = Flipper.SingleMotor.new(0)
+		scaleTween:onStep(function(alpha)
+			projectionOrbClone.Size = Vector3.new(0, 0, 0):Lerp(oldSize, alpha)
+		end)
+
+		scaleTween:setGoal(Flipper.Spring.new(1, SPRING_CONFIG.CHARACTER_SCALE))
+
+		orbTween:Play()
+		orbTween.Completed:Connect(function()
+			projectionOrbClone.Attachment.Pulse:Emit(5)
+
+			for _, descendant in projectionOrbClone:GetDescendants() do
+				if descendant:IsA("ParticleEmitter") then
+					descendant.Enabled = false
+				end
+			end
+
+			local transparencyTween = TweenService:Create(projectionOrbClone, TWEEN_INFO.PROJECTION_ORB_TRANSPARENCY, {
+				Transparency = 1,
+			})
+
+			local highlightTween = TweenService:Create(projectionOrbClone.Highlight, TWEEN_INFO.PROJECTION_ORB_TRANSPARENCY, {
+				OutlineTransparency = 1,
+				FillTransparency = 1,
+			})
+
+			transparencyTween:Play()
+			highlightTween:Play()
+
+			task.delay(0.15, function()
+				local fakeCharacter = getFakeProjectionCharacter(target)
+				if not fakeCharacter then
+					return
+				end
+				
+				fakeCharacter:Destroy()
+			end)
+
+			if target == localPlayer then
+				channel:publish("refresh", {
+					cframe = CFrame.new(destination + Vector3.new(0, 3, 0)),
+				})
+			end
+		end)
+
+		if target == localPlayer then
+			--selene: allow(incorrect_standard_library_use)
+			workspace.CurrentCamera.CameraSubject = projectionOrbClone
+		end
+	end)
 end
 
 function AstralProjection:setup()
@@ -384,6 +485,16 @@ function AstralProjection:run()
 	end
 
 	if targetHumanoid.FloorMaterial == Enum.Material.Air or targetHumanoid.Health == 0 then
+		return
+	end
+
+	-- terminate if the character is currently in the astral dimension or is
+	-- projecting someone
+	if character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER) or character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER) then
+		return
+	end
+
+	if targetCharacter:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER) or targetCharacter:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER) then
 		return
 	end
 

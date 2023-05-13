@@ -70,6 +70,9 @@ function DartPortal.new(cframe: CFrame)
     self.portal.Parent = portalsFolder
     
     self:open()
+    task.delay(1, function()
+        self:close()
+    end)
 end
 
 function DartPortal:open()

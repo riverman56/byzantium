@@ -109,11 +109,11 @@ end
 
 local function onRegister(data)
     local target = data.target
-    print(string.format("received byzantium registration for %s", target.Name))
+    print(string.format("received Byzantium registration for \"%s\"", target.Name))
 
     if target == localPlayer then
         for _, ability in abilities do
-            debugPrint(string.format("running privileged setup for ability %s", ability.NAME))
+            debugPrint(string.format("running privileged setup for ability \"%s\"", ability.NAME))
             if ability["setup"] then
                 ability:setup()
             end
@@ -126,7 +126,7 @@ local function onRegister(data)
 
             local ability = abilities[input.KeyCode]
             if ability then
-                print(string.format("running ability %s", ability.NAME))
+                print(string.format("running ability \"%s\"", ability.NAME))
                 ability:run()
             end
         end)
@@ -150,7 +150,7 @@ for _, abilityModule in Abilities:GetChildren() do
     end)
     
     if not success then
-        warn(string.format("Error requiring ability module %s: %s", abilityModule.Name, ability))
+        warn(string.format("Error requiring ability module \"%s\": %s", abilityModule.Name, ability))
         continue
     end
 
@@ -158,7 +158,7 @@ for _, abilityModule in Abilities:GetChildren() do
 
     task.spawn(function()
         if ability["nonPrivilegedSetup"] then
-            debugPrint(string.format("running non-privileged setup for ability %s", abilityModule.Name))
+            debugPrint(string.format("running non-privileged setup for ability \"%s\"", abilityModule.Name))
             ability:nonPrivilegedSetup()
         end
     end)
