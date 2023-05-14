@@ -30,7 +30,7 @@ LaserDarts.NAME = "LaserDarts"
 LaserDarts.KEYCODE = Enum.KeyCode.Y
 
 function LaserDarts:nonPrivilegedSetup()
-    channel:subscribe("laserDarts", function(data, envelope)
+    channel:subscribe("laserDarts", function(data)
         local target = data.target
         
         local targetCharacter = target.character

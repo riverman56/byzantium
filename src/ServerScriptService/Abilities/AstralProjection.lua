@@ -14,6 +14,9 @@ local Constants = require(SharedAssets.Constants)
 
 local Content = SharedAssets.Content
 local Shards = Content.Shards
+local Spikes = Content.Spikes
+local Dots = Content.Dots
+local Flames = Content.Flames
 local Animations = require(Content.Animations)
 
 local Modules = SharedAssets.Modules
@@ -35,6 +38,15 @@ local function processDescendant(descendant: any, fakeCharacter: Model)
 		if descendant.Name ~= "HumanoidRootPart" then
 			local shardsClone = Shards:Clone()
 			shardsClone.Parent = descendant
+
+			local spikesClone = Spikes:Clone()
+			spikesClone.Parent = descendant
+
+			local dotsClone = Dots:Clone()
+			dotsClone.Parent = descendant
+
+			local flamesClone = Flames:Clone()
+			flamesClone.Parent = descendant
 
 			descendant.Transparency = 0
 			descendant.CastShadow = false
@@ -260,9 +272,7 @@ channel:subscribe("astralProject", function(data, envelope)
 	sound.Parent = fakeVictimRootPart
 	sound:Play()
 
-	userAnimation.Stopped:Connect(function()
-		print("user animation ended")
-		rootPart.Anchored = false
+	userAnimation.Ended:Connect(function()
 		character:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER, false)
 	end)
 end)

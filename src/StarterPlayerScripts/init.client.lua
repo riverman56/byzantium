@@ -13,6 +13,9 @@ local Flipper = require(Packages.Flipper)
 
 local Abilities = script.Abilities
 
+local Utilities = script.Utilities
+local getCubesFolder = require(Utilities.getCubesFolder)
+
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
 local Constants = require(SharedAssets.Constants)
@@ -29,6 +32,8 @@ local localPlayer = Players.LocalPlayer
 local channel = Ropost.channel("Byzantium")
 
 local rng = Random.new()
+
+local cubesFolder = getCubesFolder()
 
 local abilities = {}
 
@@ -48,7 +53,8 @@ local function createCube(player: Player, character: Model)
     offsetAttachment.Parent = rootPart
 
     local cubeClone = SharedAssets.Cube:Clone()
-    cubeClone.Parent = character
+    cubeClone.Parent = cubesFolder
+
     local cubeMotor = Flipper.GroupMotor.new({
         x = offsetAttachment.WorldPosition.X,
         y = offsetAttachment.WorldPosition.Y,

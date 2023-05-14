@@ -77,10 +77,12 @@ end
 
 function DartPortal:open()
     tween(self.portal, true)
+    dartPortal.Open:Play()
 end
 
 function DartPortal:close()
     local closeTween = tween(self.portal, false)
+    dartPortal.Close:Play()
 
     closeTween.Completed:Connect(function()
         self.portal:Destroy()

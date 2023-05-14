@@ -247,6 +247,22 @@ local function onVictimAnimationPlayed(animationTrack: AnimationTrack, fakeChara
 	end)
 end
 
+local function onUserAnimationPlayed(animationTrack: AnimationTrack)
+	local character = localPlayer.Character
+	if not character then
+		return
+	end
+
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		return
+	end
+
+	animationTrack.Ended:Connect(function()
+		rootPart.Anchored = false
+	end)
+end
+
 --[[
 	this is nauseous logic that has to be written this specific way to ensure
 	that the timing of all effects is consistent across all clients
@@ -259,29 +275,23 @@ end
 	when a specific keyframe marker is reached
 ]]
 fakeCharactersFolder.ChildAdded:Connect(function(fakeCharacter)
-	print(string.format("fake character %s added", fakeCharacter.Name))
 	-- rudimentary class check just in case something unexpected ends up in the
 	-- folder
 	if fakeCharacter:IsA("Model") then
 		local matchingPlayer = Players:FindFirstChild(fakeCharacter.Name)
-		print(string.format("matching player for fake character %s: %s", fakeCharacter.Name, if matchingPlayer then matchingPlayer.Name else "nil"))
 
 		if matchingPlayer == localPlayer then
-			print("the matching player is the local player")
 			local fakeCharacterHumanoid = fakeCharacter:WaitForChild("Humanoid")
 			local fakeCharacterAnimator = fakeCharacterHumanoid:WaitForChild("Animator")
 
 			fakeCharacterAnimator.AnimationPlayed:Connect(function(animationTrack)
-				print("animation played on our fake character")
 				if animationTrack.Animation.AnimationId == Animations.AstralProjectVictim then
-					print("the animation being played is the victim animation. we are being astral projected and are handling the victim's client logic")
 					onVictimAnimationPlayed(animationTrack, fakeCharacter)
 				end
 			end)
 			-- we still want to handle in case the animation is already playing
 			for _, animationTrack in fakeCharacterAnimator:GetPlayingAnimationTracks() do
 				if animationTrack.Animation.AnimationId == Animations.AstralProjectVictim then
-					print("the animation being played is the victim animation. we are being astral projected and are handling the victim's client logic")
 					onVictimAnimationPlayed(animationTrack, fakeCharacter)
 				end
 			end
@@ -330,6 +340,9 @@ end)
 local function onLocalCharacterAdded(character: Model)
 	local rootPart = character:WaitForChild("HumanoidRootPart")
 
+	local humanoid = character:WaitForChild("Humanoid")
+	local animator = humanoid:WaitForChild("Animator")
+
 	alignOrientation = Instance.new("AlignOrientation")
 	alignOrientation.Enabled = false
 	alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
@@ -345,6 +358,12 @@ local function onLocalCharacterAdded(character: Model)
 	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
 	vectorForce.Attachment0 = rootPart.RootAttachment
 	vectorForce.Parent = rootPart
+
+	animator.AnimationPlayed:Connect(function(animationTrack)
+		if animationTrack.Animation.AnimationId == Animations.AstralProjectUser then
+			onUserAnimationPlayed(animationTrack)
+		end
+	end)
 end
 
 local AstralProjection = {}
@@ -472,6 +491,13 @@ function AstralProjection:run()
 	local targetPlayer = Players:GetPlayerFromCharacter(targetCharacter)
 	if not targetPlayer then
 		return
+	end
+
+	-- self projection
+	if targetPlayer == localPlayer then
+		if character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER) or character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER) then
+			return
+		end
 	end
 
 	local targetRootPart = targetCharacter:FindFirstChild("HumanoidRootPart")

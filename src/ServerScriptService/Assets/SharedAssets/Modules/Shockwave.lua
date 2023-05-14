@@ -19,6 +19,8 @@ function Shockwave:shockwave(cframe: CFrame)
     shockwaveClone.CFrame = cframe
     shockwaveClone.Parent = workspace
 
+    shockwaveClone.Impact:Play()
+
     sizeTween:Play()
     for _, descendant in shockwaveClone:GetDescendants() do
         if descendant:IsA("ParticleEmitter") then

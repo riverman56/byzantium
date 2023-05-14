@@ -76,7 +76,7 @@ function Laser:dart(cframe: CFrame, color: Color3)
 
 	dartClone.Parent = workspace
 	
-	--dartClone.Sphere.Fire:Play()
+	dartClone.Sphere.Fire:Play()
 		
 	transparencyTween:Play()
 	position1Tween:Play()
