@@ -57,15 +57,10 @@ function Ragdoll:setup(character: Model)
                 end
             end
 
-            --joint.Part1.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0)
-
             ballSocketConstraint.Parent = joint.Parent
-
             table.insert(ballSocketConstraints, ballSocketConstraint)
         end
     end
-
-    
 
     return ballSocketConstraints
 end

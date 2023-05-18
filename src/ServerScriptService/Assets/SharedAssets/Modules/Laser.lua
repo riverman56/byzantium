@@ -44,6 +44,9 @@ function Laser:origin(cframe: CFrame)
 	originClone:PivotTo(cframe)
 
 	originClone.Core.Charge:Play()
+	originClone.Cube.Attachment.Flare:Emit(originClone.Cube.Attachment.Flare:GetAttribute("EmitCount"))
+	originClone.Cube.Attachment.Shine:Emit(originClone.Cube.Attachment.Shine:GetAttribute("EmitCount"))
+	originClone.Cube.Attachment.Shine2:Emit(originClone.Cube.Attachment.Shine2:GetAttribute("EmitCount"))
 
 	return originClone
 end
@@ -83,6 +86,8 @@ function Laser:dart(cframe: CFrame, color: Color3)
 	position1Tween.Completed:Connect(function()
 		position2Tween:Play()
 		position2Tween.Completed:Connect(function()
+			dartClone.Sphere.Embers.Enabled = false
+			dartClone.Sphere.Squares.Enabled = false
 			transparencyOutTween:Play()
 		end)
 	end)
@@ -125,6 +130,8 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	position1Tween.Completed:Connect(function()
 		position2Tween:Play()
 		position2Tween.Completed:Connect(function()
+			laserClone.Sphere.Embers.Enabled = false
+			laserClone.Sphere.Squares.Enabled = false
 			transparencyOutTween:Play()
 		end)
 	end)

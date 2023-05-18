@@ -8,6 +8,8 @@ local castFromMouse = require(Utilities.castFromMouse)
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
+local Constants = require(SharedAssets.Constants)
+
 local Modules = SharedAssets.Modules
 local Portals = require(Modules.Portals)
 
@@ -47,6 +49,10 @@ function Teleport:run()
     if not character then
         return
     end
+
+    if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
+		return
+	end
 
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     if not rootPart then

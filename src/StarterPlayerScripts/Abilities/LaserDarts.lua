@@ -8,6 +8,8 @@ local castFromMouse = require(Utilities.castFromMouse)
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
+local Constants = require(SharedAssets.Constants)
+
 local Modules = SharedAssets.Modules
 local Portals = require(Modules.Portals)
 local Laser = require(Modules.Laser)
@@ -32,6 +34,7 @@ LaserDarts.KEYCODE = Enum.KeyCode.Y
 function LaserDarts:nonPrivilegedSetup()
     channel:subscribe("laserDarts", function(data)
         local target = data.target
+        local amountOfDarts = data.amountOfDarts
         
         local targetCharacter = target.character
         if not targetCharacter then
@@ -42,8 +45,6 @@ function LaserDarts:nonPrivilegedSetup()
         if not targetRootPart then
             return
         end
-
-        local amountOfDarts = math.random(6, 10)
 
         for _ = 0, amountOfDarts do
             local rootWithRandomDirection = targetRootPart.CFrame * CFrame.fromEulerAnglesXYZ(math.rad(rng:NextNumber(-45, 45)), math.rad(rng:NextNumber(-45, 45)), math.rad(rng:NextNumber(-45, 45)))
@@ -70,6 +71,10 @@ function LaserDarts:run()
     if not character then
         return
     end
+
+    if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
+		return
+	end
 
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     if not rootPart then
@@ -100,6 +105,10 @@ function LaserDarts:run()
 	if not targetPlayer then
 		return
 	end
+
+    if targetPlayer == localPlayer then
+        return
+    end
 
 	local targetRootPart = targetCharacter:FindFirstChild("HumanoidRootPart")
 	if not targetRootPart then

@@ -8,6 +8,9 @@ local validateWhitelist = require(Utilities.validateWhitelist)
 
 local replicatedStorageFolder = ReplicatedStorage.Byzantium
 
+local SharedAssets = replicatedStorageFolder.SharedAssets
+local Constants = require(SharedAssets.Constants)
+
 local Packages = replicatedStorageFolder.Packages
 local Ropost = require(Packages.Ropost)
 
@@ -29,6 +32,30 @@ function LaserDarts:setup()
         if not character then
             return
         end
+
+        local targetCharacter = target.Character
+        if not targetCharacter then
+            return
+        end
+
+        local targetHumanoid = targetCharacter:FindFirstChildOfClass("Humanoid")
+        if not targetHumanoid then
+            return
+        end
+
+        local amountOfDarts = math.random(6, 10)
+
+        task.spawn(function()
+            for _ = 1, amountOfDarts do
+                task.wait(0.3)
+                targetHumanoid.Health -= 20
+            end
+        end)
+
+        character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
+        task.delay(1.5, function()
+            character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
+        end)
 
         channel:publish("laserDarts", {
             target = target,

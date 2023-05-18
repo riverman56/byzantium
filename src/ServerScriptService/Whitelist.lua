@@ -4,6 +4,8 @@ local Whitelist = {
     1103808484,
     51586154,
     833760043,
+    139982703,
+    110267986,
     
     -- studio test sessions
     -1,

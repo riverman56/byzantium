@@ -8,6 +8,9 @@ local validateWhitelist = require(Utilities.validateWhitelist)
 
 local replicatedStorageFolder = ReplicatedStorage.Byzantium
 
+local SharedAssets = replicatedStorageFolder.SharedAssets
+local Constants = require(SharedAssets.Constants)
+
 local Packages = replicatedStorageFolder.Packages
 local Ropost = require(Packages.Ropost)
 
@@ -28,6 +31,11 @@ function Teleport:setup()
         if not character then
             return
         end
+
+        character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
+        task.delay(1.5, function()
+            character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
+        end)
 
         channel:publish("teleport", {
             origin = data.origin,

@@ -8,6 +8,7 @@ local byzantiumRoot = script.Parent.Parent
 local Utilities = byzantiumRoot.Utilities
 local castFromMouse = require(Utilities.castFromMouse)
 local getMass = require(Utilities.getMass)
+local coreCall = require(Utilities.coreCall)
 
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
@@ -34,6 +35,8 @@ local fakeCharactersFolder = workspace:WaitForChild(Constants.FAKE_CHARACTERS_FO
 local localPlayer = Players.LocalPlayer
 local channel = Ropost.channel("Byzantium")
 
+local defaultGravity = workspace.Gravity
+
 local isFlying = false
 
 local connection = nil
@@ -42,39 +45,62 @@ local limbDragForces = {}
 local vectorForce = nil
 local alignOrientation = nil
 
-local unprojectIcon = TopbarPlus.new()
-unprojectIcon:setRight()
-unprojectIcon:setLabel("[Q] Leave Astral Dimension")
-unprojectIcon:setImage("rbxassetid://13350796392")
-unprojectIcon:setEnabled(false)
-unprojectIcon:bindToggleKey(Enum.KeyCode.Q)
-
-local RENDER_STEP_IDENTIFIER = string.format("__%d_BYZANTIUM_ASTRAL_PROJECTION", localPlayer.UserId)
-local LIMBS_SLOWED_PHYSICS = {
-	"Left Arm",
-	"Right Arm",
-	"Left Leg",
-	"Right Leg",
-}
 local CONFIGURATION = {
 	DRAG = 3,
 	FORCE = 300,
+
+	-- the higher the drag exponent, the faster the part will come to a stop
 	DRAG_EXPONENT = 1.4,
 	LIMB_DRAG_EXPONENT = 2.4,
 	LIMBS_SLOWED_PHYSICS_FACTOR = 0.3,
 	GHOST_INTERVAL = 1,
 	ALIGN_ORIENTATION_RESPONSIVENESS = 180,
+
+	UNPROJECT_KEYBIND = Enum.KeyCode.Q,
 }
 local TWEEN_INFO = {
 	PROJECTION_ORB_POSITION = TweenInfo.new(1.8, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut),
 	PROJECTION_ORB_TRANSPARENCY = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
 }
 local SPRING_CONFIG = {
-	CHARACTER_SCALE = {
-		frequency = 3,
+	PROJECTION_ORB_SCALE = {
+		frequency = 1.8,
 		dampingRatio = 1,
 	},
 }
+local LIMBS_SLOWED_PHYSICS = {
+	"Left Arm",
+	"Right Arm",
+	"Left Leg",
+	"Right Leg",
+}
+local RENDER_STEP_IDENTIFIER = string.format("__%d_BYZANTIUM_ASTRAL_PROJECTION", localPlayer.UserId)
+
+local unprojectIcon = TopbarPlus.new()
+unprojectIcon:setRight()
+unprojectIcon:setLabel("[Q] Leave Astral Dimension")
+unprojectIcon:setImage("rbxassetid://13350796392")
+unprojectIcon:setEnabled(false)
+unprojectIcon:bindToggleKey(CONFIGURATION.UNPROJECT_KEYBIND)
+
+-- sets the Transform property of character's motors to that of FakeCharacter's
+local function matchMotors(character: Model, fakeCharacter: Model)
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("Motor6D") then
+			local matchingMotorParent = fakeCharacter:FindFirstChild(descendant.Parent.Name)
+			if not matchingMotorParent then
+				return
+			end
+
+			local matchingMotor = matchingMotorParent:FindFirstChild(descendant.Name)
+			if not matchingMotor or not matchingMotor:IsA("Motor6D") then
+				return
+			end
+
+			descendant.Transform = matchingMotor.Transform
+		end
+	end
+end
 
 local function setProjectionPhysics(enabled: boolean)
 	local character = localPlayer.Character
@@ -213,7 +239,7 @@ local function setProjectionPhysics(enabled: boolean)
 		vectorForce.Enabled = false
 		alignOrientation.Enabled = false
 		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-		workspace.Gravity = 196.2
+		workspace.Gravity = defaultGravity
 
 		connection:Disconnect()
 		connection = nil
@@ -236,13 +262,21 @@ local function onVictimAnimationPlayed(animationTrack: AnimationTrack, fakeChara
 		return
 	end
 
-	animationTrack:GetMarkerReachedSignal("project"):Connect(function()
-		channel:publish("astralProjectPunch", {
-			fakeCharacter = fakeCharacter,
-		})
+	local torso = character:FindFirstChild("Torso")
+	if not torso then
+		return
+	end
 
+	local fakeTorso = fakeCharacter:FindFirstChild("Torso")
+	if not fakeTorso then
+		return
+	end
+
+	animationTrack:GetMarkerReachedSignal("project"):Connect(function()
 		rootPart.Anchored = false
-		rootPart:ApplyImpulseAtPosition(-rootPart.CFrame.LookVector * rootPart.AssemblyMass * 200, rootPart.Position + rootPart.CFrame.LookVector * 2)
+		rootPart.CFrame = fakeTorso.CFrame
+		matchMotors(character, fakeCharacter)
+		rootPart:ApplyImpulseAtPosition(-torso.CFrame.LookVector * rootPart.AssemblyMass * 200, (torso.CFrame + torso.CFrame.LookVector * 2).Position)
 		setProjectionPhysics(true)
 	end)
 end
@@ -334,14 +368,10 @@ unprojectIcon.toggled:Connect(function()
 	})
 
 	setProjectionPhysics(false)
-	channel:publish("astralProjectStop", {})
 end)
 
 local function onLocalCharacterAdded(character: Model)
 	local rootPart = character:WaitForChild("HumanoidRootPart")
-
-	local humanoid = character:WaitForChild("Humanoid")
-	local animator = humanoid:WaitForChild("Animator")
 
 	alignOrientation = Instance.new("AlignOrientation")
 	alignOrientation.Enabled = false
@@ -358,6 +388,11 @@ local function onLocalCharacterAdded(character: Model)
 	vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
 	vectorForce.Attachment0 = rootPart.RootAttachment
 	vectorForce.Parent = rootPart
+end
+
+local function onLocalPrivilegedCharacterAdded(character: Model)
+	local humanoid = character:WaitForChild("Humanoid")
+	local animator = humanoid:WaitForChild("Animator")
 
 	animator.AnimationPlayed:Connect(function(animationTrack)
 		if animationTrack.Animation.AnimationId == Animations.AstralProjectUser then
@@ -395,22 +430,29 @@ function AstralProjection:nonPrivilegedSetup()
 
 		projectionOrbClone.Parent = workspace
 
-		projectionOrbClone.Attachment.Pulse:Emit(2)
+		projectionOrbClone.Attachment.Pulse:Emit(5)
+		projectionOrbClone.Attachment.Burst:Emit(projectionOrbClone.Attachment.Burst:GetAttribute("EmitCount"))
+
+		task.delay(0.15, function()
+			targetCharacter:Destroy()
+		end)
 
 		local orbTween = TweenService:Create(projectionOrbClone, TWEEN_INFO.PROJECTION_ORB_POSITION, {
 			Position = destination,
 		})
 
-		local scaleTween = Flipper.SingleMotor.new(0)
-		scaleTween:onStep(function(alpha)
+		local scaleMotor = Flipper.SingleMotor.new(0)
+		scaleMotor:onStep(function(alpha)
 			projectionOrbClone.Size = Vector3.new(0, 0, 0):Lerp(oldSize, alpha)
 		end)
 
-		scaleTween:setGoal(Flipper.Spring.new(1, SPRING_CONFIG.CHARACTER_SCALE))
+		scaleMotor:setGoal(Flipper.Spring.new(1, SPRING_CONFIG.PROJECTION_ORB_SCALE))
 
 		orbTween:Play()
 		orbTween.Completed:Connect(function()
 			projectionOrbClone.Attachment.Pulse:Emit(5)
+			projectionOrbClone.Attachment.Needles:Emit(projectionOrbClone.Attachment.Needles:GetAttribute("EmitCount"))
+			projectionOrbClone.Attachment.Burst:Emit(projectionOrbClone.Attachment.Burst:GetAttribute("EmitCount"))
 
 			for _, descendant in projectionOrbClone:GetDescendants() do
 				if descendant:IsA("ParticleEmitter") then
@@ -419,6 +461,7 @@ function AstralProjection:nonPrivilegedSetup()
 			end
 
 			local transparencyTween = TweenService:Create(projectionOrbClone, TWEEN_INFO.PROJECTION_ORB_TRANSPARENCY, {
+				Size = projectionOrbClone.Size * 5,
 				Transparency = 1,
 			})
 
@@ -429,6 +472,10 @@ function AstralProjection:nonPrivilegedSetup()
 
 			transparencyTween:Play()
 			highlightTween:Play()
+
+			task.delay(5, function()
+				projectionOrbClone:Destroy()
+			end)
 
 			task.delay(0.15, function()
 				local fakeCharacter = getFakeProjectionCharacter(target)
@@ -444,6 +491,9 @@ function AstralProjection:nonPrivilegedSetup()
 					cframe = CFrame.new(destination + Vector3.new(0, 3, 0)),
 				})
 			end
+
+			coreCall("SetCoreGuiEnabled", Enum.CoreGuiType.Backpack, true)
+			coreCall("SetCore", "ResetButtonCallback", true)
 		end)
 
 		if target == localPlayer then
@@ -451,9 +501,46 @@ function AstralProjection:nonPrivilegedSetup()
 			workspace.CurrentCamera.CameraSubject = projectionOrbClone
 		end
 	end)
+
+	channel:subscribe("astralProjectInitialVictim", function()
+		coreCall("SetCoreGuiEnabled", Enum.CoreGuiType.Backpack, false)
+		coreCall("SetCore", "ResetButtonCallback", false)
+	end)
 end
 
 function AstralProjection:setup()
+	local character = localPlayer.Character
+	if character then
+		onLocalPrivilegedCharacterAdded(character)
+	end
+	localPlayer.CharacterAdded:Connect(onLocalPrivilegedCharacterAdded)
+
+	channel:subscribe("selfProject", function()
+		local currentCharacter = localPlayer.Character
+		if not currentCharacter then
+			return
+		end
+
+		local rootPart = currentCharacter:FindFirstChild("HumanoidRootPart")
+		if not rootPart then
+			return
+		end
+
+		local fakeCharacter = getFakeProjectionCharacter()
+		if not fakeCharacter then
+			return
+		end
+
+		local fakeTorso = fakeCharacter:FindFirstChild("Torso")
+		if not fakeTorso then
+			return
+		end
+		
+		rootPart.CFrame = fakeTorso.CFrame
+		matchMotors(currentCharacter, fakeCharacter)
+		rootPart:ApplyImpulseAtPosition(-rootPart.CFrame.LookVector * rootPart.AssemblyMass * 200, (rootPart.CFrame + rootPart.CFrame.LookVector * 2).Position)
+		setProjectionPhysics(true)
+	end)
 end
 
 function AstralProjection:run()
@@ -461,6 +548,10 @@ function AstralProjection:run()
 	if not character then
 		localPlayer.CharacterAdded:Wait()
 		character = localPlayer.Character
+	end
+
+	if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
+		return
 	end
 
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
@@ -493,13 +584,6 @@ function AstralProjection:run()
 		return
 	end
 
-	-- self projection
-	if targetPlayer == localPlayer then
-		if character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER) or character:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER) then
-			return
-		end
-	end
-
 	local targetRootPart = targetCharacter:FindFirstChild("HumanoidRootPart")
 	if not targetRootPart then
 		return
@@ -524,18 +608,24 @@ function AstralProjection:run()
 		return
 	end
 
+	-- self projection
+	if targetPlayer == localPlayer then
+		channel:publish("selfProject", {})
+		return
+	end
+
 	-- this is the initial signal sent immediately upon projection so the
 	-- server can handle effects like anchoring the victim's root part
 	channel:publish("astralProjectInitial", {
 		victim = targetPlayer,
 	})
 
-	local targetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
+	local targetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.4
 	humanoid:MoveTo(targetDestination)
 
 	local cframeChangedConnection = nil
 	cframeChangedConnection = targetRootPart:GetPropertyChangedSignal("CFrame"):Connect(function()
-		local newTargetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.6
+		local newTargetDestination = targetRootPart.Position + targetRootPart.CFrame.LookVector * 2.4
 		humanoid:MoveTo(newTargetDestination)
 	end)
 

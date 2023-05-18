@@ -5,6 +5,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Utilities = script.Utilities
 local distribute = require(Utilities.distribute)
 distribute()
+local createFolders = require(Utilities.createFolders)
+createFolders()
 
 local Abilities = script.Abilities
 

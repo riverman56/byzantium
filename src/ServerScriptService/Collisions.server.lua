@@ -1,6 +1,7 @@
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 
+-- TODO: move collision group names to constants file
 PhysicsService:RegisterCollisionGroup("ByzantiumCharacters")
 PhysicsService:RegisterCollisionGroup("Characters")
 PhysicsService:CollisionGroupSetCollidable("Characters", "ByzantiumCharacters", false)

@@ -11,6 +11,8 @@ local Modules = SharedAssets.Modules
 local HitDetection = require(Modules.HitDetection)
 local Laser = require(Modules.Laser)
 
+local Constants = require(SharedAssets.Constants)
+
 local Content = SharedAssets.Content
 local Animations = require(Content.Animations)
 
@@ -149,6 +151,7 @@ function LaserBlast:nonPrivilegedSetup()
         laserBlastAnimation:Play()
 
         laserBlastAnimation:GetMarkerReachedSignal("fire"):Connect(function()
+            origin.Cube.Attachment.Pulse:Emit(origin.Cube.Attachment.Pulse:GetAttribute("EmitCount"))
             laserBlastAnimation:AdjustWeight(0.9, 0.3)
             Laser:laser(rootPart.CFrame + rootPart.CFrame.LookVector * 2.5, Color3.fromRGB(111, 100, 255), 0)
 
@@ -201,6 +204,19 @@ end
 function LaserBlast:run()
     local character = localPlayer.character
     if not character then
+        return
+    end
+
+    if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
+		return
+	end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return
+    end
+
+    if humanoid.Health == 0 then
         return
     end
 

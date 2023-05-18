@@ -11,11 +11,6 @@ local Packages = replicatedStorageFolder.Packages
 local Ropost = require(Packages.Ropost)
 local Flipper = require(Packages.Flipper)
 
-local Abilities = script.Abilities
-
-local Utilities = script.Utilities
-local getCubesFolder = require(Utilities.getCubesFolder)
-
 local SharedAssets = replicatedStorageFolder.SharedAssets
 
 local Constants = require(SharedAssets.Constants)
@@ -23,17 +18,19 @@ local Configuration = require(SharedAssets.Configuration)
 
 local Content = SharedAssets.Content
 local Animations = require(Content.Animations)
+local Sounds = require(Content.Sounds)
 
 local SharedUtilities = SharedAssets.Utilities
 local debugPrint = require(SharedUtilities.debugPrint)
 
-local localPlayer = Players.LocalPlayer
+local Abilities = script.Abilities
 
+local localPlayer = Players.LocalPlayer
 local channel = Ropost.channel("Byzantium")
 
 local rng = Random.new()
 
-local cubesFolder = getCubesFolder()
+local cubesFolder = workspace:WaitForChild(Constants.CUBES_FOLDER_IDENTIFIER)
 
 local abilities = {}
 
@@ -41,7 +38,11 @@ local SPRING_CONFIG = {
     frequency = 4,
     dampingRatio = 0.9,
 }
-local ROTATION_TWEEN_INFO = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local TWEEN_INFO = {
+    ROTATION = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    ROTATION_ACTION = TweenInfo.new(1.5, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
+    HIGHLIGHT = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+}
 
 local function createCube(player: Player, character: Model)
     debugPrint(string.format("creating Byzantium cube for player \"%s\"", player.Name))
@@ -53,7 +54,16 @@ local function createCube(player: Player, character: Model)
     offsetAttachment.Parent = rootPart
 
     local cubeClone = SharedAssets.Cube:Clone()
+    cubeClone.Name = player.Name
     cubeClone.Parent = cubesFolder
+
+    local highlightFadeTween = TweenService:Create(cubeClone.Highlight, TWEEN_INFO.HIGHLIGHT, {
+        FillTransparency = 0.8,
+    })
+
+    local highlightAppearTween = TweenService:Create(cubeClone.Highlight, TWEEN_INFO.HIGHLIGHT, {
+        FillTransparency = 0,
+    })
 
     local cubeMotor = Flipper.GroupMotor.new({
         x = offsetAttachment.WorldPosition.X,
@@ -66,19 +76,21 @@ local function createCube(player: Player, character: Model)
 
     cubeClone.Hum:Play()
 
+    local isInAction = false
+
     local lastPosition = offsetAttachment.WorldPosition
     local elapsed = 0
     local goal = rng:NextNumber(2, 4)
     local cubeRotationConnection = RunService.Heartbeat:Connect(function(deltaTime)
         elapsed += deltaTime
-        if elapsed >= goal then
-            local tween = TweenService:Create(cubeClone, ROTATION_TWEEN_INFO, {
+        if elapsed >= goal and not isInAction then
+            local tween = TweenService:Create(cubeClone, TWEEN_INFO.ROTATION, {
                 Orientation = Vector3.new(rng:NextNumber(-520, 520), rng:NextNumber(-520, 520), rng:NextNumber(-520, 520)),
             })
             tween:Play()
 
             -- randomize the duration of the next rotation and the time to wait
-            ROTATION_TWEEN_INFO = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+            TWEEN_INFO.ROTATION = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
             goal = rng:NextNumber(2, 4)
             elapsed = 0
         end
@@ -104,12 +116,34 @@ local function createCube(player: Player, character: Model)
         lastPosition = newPosition
     end)
 
+    local attributeChangedConnection = nil
+    attributeChangedConnection = character:GetAttributeChangedSignal(Constants.ACTION_ATTRIBUTE_IDENTIFIER):Connect(function()
+        if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
+            local tween = TweenService:Create(cubeClone, TWEEN_INFO.ROTATION_ACTION, {
+                Orientation = Vector3.new(rng:NextNumber(-5020, 5020), rng:NextNumber(-5020, 5020), rng:NextNumber(-5020, 5020)),
+            })
+            tween:Play()
+            
+            isInAction = true
+            cubeClone.Action:Play()
+            highlightAppearTween:Play()
+        else
+            isInAction = false
+            cubeClone.Action:Play()
+            highlightFadeTween:Play()
+        end
+    end)
+
     local characterRemovingConnection = nil
     characterRemovingConnection = player.CharacterRemoving:Connect(function()
         characterRemovingConnection:Disconnect()
         characterRemovingConnection = nil
         cubeRotationConnection:Disconnect()
         cubeRotationConnection = nil
+        attributeChangedConnection:Disconnect()
+        attributeChangedConnection = nil
+        
+        cubeClone:Destroy()
     end)
 end
 
@@ -175,7 +209,17 @@ for _, animationId in Animations do
 	table.insert(animationsArray, animationId)
 end
 
+local soundsArray = {}
+for _, soundId in Sounds do
+	table.insert(soundsArray, soundId)
+end
+
 local now = os.clock()
 debugPrint("begin animation preload")
 ContentProvider:PreloadAsync(animationsArray)
 debugPrint(string.format("end animation preload: %s seconds", tostring(os.clock() - now)))
+
+now = os.clock()
+debugPrint("begin sound preload")
+ContentProvider:PreloadAsync(soundsArray)
+debugPrint(string.format("end sound preload: %s seconds", tostring(os.clock() - now)))
