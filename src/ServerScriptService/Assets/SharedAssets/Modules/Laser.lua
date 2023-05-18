@@ -44,9 +44,9 @@ function Laser:origin(cframe: CFrame)
 	originClone:PivotTo(cframe)
 
 	originClone.Core.Charge:Play()
-	originClone.Cube.Attachment.Flare:Emit(originClone.Cube.Attachment.Flare:GetAttribute("EmitCount"))
-	originClone.Cube.Attachment.Shine:Emit(originClone.Cube.Attachment.Shine:GetAttribute("EmitCount"))
-	originClone.Cube.Attachment.Shine2:Emit(originClone.Cube.Attachment.Shine2:GetAttribute("EmitCount"))
+	originClone.Core.Attachment.Flare:Emit(originClone.Core.Attachment.Flare:GetAttribute("EmitCount"))
+	originClone.Core.Attachment.Shine:Emit(originClone.Core.Attachment.Shine:GetAttribute("EmitCount"))
+	originClone.Core.Attachment.Shine2:Emit(originClone.Core.Attachment.Shine2:GetAttribute("EmitCount"))
 
 	return originClone
 end

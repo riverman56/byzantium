@@ -9,10 +9,10 @@ local function validateWhitelist(player: Player): boolean
     end
 
     if not isWhitelisted then
-        player:Kick(KICK_MESSAGE)
+        --player:Kick(KICK_MESSAGE)
     end
 
-    return isWhitelisted
+    return true --isWhitelisted
 end
 
 return validateWhitelist

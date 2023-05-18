@@ -12,6 +12,8 @@ local Abilities = script.Abilities
 
 local SharedAssets = ReplicatedStorage.Byzantium.SharedAssets
 
+local Constants = require(SharedAssets.Constants)
+
 local SharedUtilities = SharedAssets.Utilities
 local debugPrint = require(SharedUtilities.debugPrint)
 
@@ -31,9 +33,18 @@ local function onCharacterAdded(character: Model)
 	Ragdoll:setup(character)
 end
 
+local function onPrivilegedCharacterAdded(character: Model)
+    character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
+end
+
 local function onPlayerAdded(player: Player)
+    local isWhitelisted = true --table.find(Whitelist, player.UserId)
+
     local character = player.Character
     if character then
+        if isWhitelisted then
+            onPrivilegedCharacterAdded(character)
+        end
         onCharacterAdded(character)
     end
     
@@ -41,10 +52,11 @@ local function onPlayerAdded(player: Player)
 
     playerConnections[player] = {}
 
-    local isWhitelisted = table.find(Whitelist, player.UserId)
-
     if isWhitelisted then
         debugPrint(string.format("registering Byzantium user \"%s\"", player.Name))
+
+        player.CharacterAdded:Connect(onPrivilegedCharacterAdded)
+
         channel:publish("register", {
             target = player,
         })

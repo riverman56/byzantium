@@ -430,6 +430,9 @@ function AstralProjection:nonPrivilegedSetup()
 
 		projectionOrbClone.Parent = workspace
 
+		projectionOrbClone.Summon:Play()
+		projectionOrbClone.Idle:Play()
+
 		projectionOrbClone.Attachment.Pulse:Emit(5)
 		projectionOrbClone.Attachment.Burst:Emit(projectionOrbClone.Attachment.Burst:GetAttribute("EmitCount"))
 
@@ -472,6 +475,8 @@ function AstralProjection:nonPrivilegedSetup()
 
 			transparencyTween:Play()
 			highlightTween:Play()
+			
+			projectionOrbClone.Unsummon:Play()
 
 			task.delay(5, function()
 				projectionOrbClone:Destroy()

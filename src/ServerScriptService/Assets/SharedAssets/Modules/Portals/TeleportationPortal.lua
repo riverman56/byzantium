@@ -89,8 +89,11 @@ function TeleportationPortal:open()
 		Size = Vector3.new(8, 9, 2),
 	})
 
-	tweenDoor(self.portal.Left, true)
-	local doorTween = tweenDoor(self.portal.Right, true)
+    self.portal.Core.Open:Play()
+    self.portal.Core.Hum:Play()
+
+    tweenDoor(self.portal.Left, true)
+    local doorTween = tweenDoor(self.portal.Right, true)
 
 	doorTween.Completed:Connect(function()
 		self.portal.Core.Transparency = 0
@@ -103,9 +106,11 @@ function TeleportationPortal:close()
 		Size = Vector3.new(0, 9, 2),
 	})
 
-	tweenDoor(self.portal.Left, false)
-	local doorTween = tweenDoor(self.portal.Right, false)
-	contractTween:Play()
+    self.portal.Core.Close:Play()
+
+    tweenDoor(self.portal.Left, false)
+    local doorTween = tweenDoor(self.portal.Right, false)
+    contractTween:Play()
 
 	for _, viewportFrame in playerGui:GetChildren() do
 		if viewportFrame.Name == "PortalViewport" then
@@ -119,9 +124,11 @@ function TeleportationPortal:close()
 
 	localPlayer.Character:FindFirstChild("PortalInit").Enabled = false
 
-	doorTween.Completed:Connect(function()
+    doorTween.Completed:Connect(function()
+        self.portal.Left.Highlight.OutlineTransparency = 1
+        self.portal.Right.Highlight.OutlineTransparency = 1
 		self.portal:Destroy()
-	end)
+    end)
 end
 
 return TeleportationPortal

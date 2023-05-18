@@ -32,6 +32,10 @@ function Teleport:setup()
             return
         end
 
+        if not character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+		    character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
+	    end
+
         character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
         task.delay(1.5, function()
             character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)

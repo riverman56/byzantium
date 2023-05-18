@@ -146,7 +146,7 @@ local function createFakeCharacter(player: Player): Model?
 		return
 	end
 
-	setCollisionGroup(fakeCharacter, "ByzantiumCharacters")
+	setCollisionGroup(fakeCharacter, Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER)
 	fakeCharacter:SetAttribute("Mass", fakeRootPart.AssemblyMass)
 
 	fakeHumanoid.DisplayName = player.DisplayName
@@ -185,6 +185,11 @@ channel:subscribe("astralProjectInitial", function(data, envelope)
 	local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
 	if not victimRootPart then
 		return
+	end
+
+	local existingFakeCharacter = fakeCharactersFolder:FindFirstChild(victim.Name)
+	if existingFakeCharacter then
+		existingFakeCharacter:Destroy()
 	end
 
 	victimCharacter:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER, true)
@@ -246,6 +251,10 @@ channel:subscribe("astralProject", function(data, envelope)
 	if not victimAnimator then
 		return
 	end
+	
+	if not character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+		character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
+	end
 
 	channel:publish("astralProjectInitialVictim", {}, { victim })
 
@@ -280,7 +289,7 @@ channel:subscribe("astralProject", function(data, envelope)
 		local fakeCharacterMass = fakeCharacter:GetAttribute("Mass")
 
     	-- players cannot interact with the projection ghost
-		setCollisionGroup(victimCharacter, "ByzantiumCharacters")
+		setCollisionGroup(victimCharacter, Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER)
 
 		victimRootPart.Anchored = false
 		fakeRootPart.Anchored = false
@@ -360,12 +369,21 @@ channel:subscribe("selfProject", function(_, envelope)
 		return
 	end
 
+	if not character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+		character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
+	end
+
+	character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
+    task.delay(1.5, function()
+         character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
+    end)
+
 	channel:publish("astralProjectInitialVictim", {}, { player })
 
 	playSound(Sounds.SelfProject, fakeRootPart, 7)
 
     -- players cannot interact with the projection ghost
-	setCollisionGroup(character, "ByzantiumCharacters")
+	setCollisionGroup(character, Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER)
 
 	humanoid:UnequipTools()
 	for _, animationTrack in animator:GetPlayingAnimationTracks() do

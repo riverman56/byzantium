@@ -15,9 +15,6 @@ local Portals = require(Modules.Portals)
 local Laser = require(Modules.Laser)
 local Shockwave = require(Modules.Shockwave)
 
-local Content = SharedAssets.Content
-local Animations = require(Content.Animations)
-
 local Packages = replicatedStorageFolder.Packages
 local Ropost = require(Packages.Ropost)
 

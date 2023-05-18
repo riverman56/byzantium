@@ -1,11 +1,14 @@
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- TODO: move collision group names to constants file
-PhysicsService:RegisterCollisionGroup("ByzantiumCharacters")
-PhysicsService:RegisterCollisionGroup("Characters")
-PhysicsService:CollisionGroupSetCollidable("Characters", "ByzantiumCharacters", false)
-PhysicsService:CollisionGroupSetCollidable("ByzantiumCharacters", "ByzantiumCharacters", false)
+local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
+local Constants = require(replicatedStorageFolder.SharedAssets.Constants)
+
+PhysicsService:RegisterCollisionGroup(Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER)
+PhysicsService:RegisterCollisionGroup(Constants.CHARACTERS_COLLISION_GROUP_IDENTIFIER)
+PhysicsService:CollisionGroupSetCollidable(Constants.CHARACTERS_COLLISION_GROUP_IDENTIFIER, Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER, false)
+PhysicsService:CollisionGroupSetCollidable(Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER, Constants.BYZANTIUM_CHARACTERS_COLLISION_GROUP_IDENTIFIER, false)
 
 local function onDescendantAdded(descendant)
 	if descendant:IsA("BasePart") then

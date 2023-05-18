@@ -3,6 +3,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local byzantiumRoot = script.Parent.Parent
+
+local Utilities = byzantiumRoot.Utilities
+local weld = require(Utilities.weld)
+
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
@@ -49,18 +54,8 @@ local SPRING_CONFIGS = {
     BOUNCE2 = {
         frequency = 2.5,
         dampingRatio = 0.2,
-    }
+    },
 }
-
-local function weld(part0: BasePart, part1: BasePart)
-    local weldInstance = Instance.new("Weld")
-    weldInstance.Name = part1.Name
-    weldInstance.Part0 = part0
-    weldInstance.Part1 = part1
-    weldInstance.C0 = part1.CFrame:ToObjectSpace(part0.CFrame)
-    weldInstance.Parent = part1
-    return weldInstance
-end
 
 local LaserBlast = {}
 LaserBlast.NAME = "LaserBlast"
@@ -97,7 +92,7 @@ function LaserBlast:nonPrivilegedSetup()
 
         local origin = Laser:origin((rightArm.CFrame + rightArm.CFrame.UpVector))
         weld(rightArm, origin.Core)
-        origin.Core.Shards.C1 = CFrame.new(0, 0, -1)
+
         for _, component in origin:GetChildren() do
             if component:IsA("BasePart") and component.Name ~= "Core" then
                 component.Transparency = 1
@@ -143,7 +138,7 @@ function LaserBlast:nonPrivilegedSetup()
 
         positionMotor:setGoal(Flipper.Spring.new(1, SPRING_CONFIGS.POSITION))
     
-        origin.Cube.Attachment.Flare:Emit(10)
+        origin.Core.Attachment.Flare:Emit(10)
 
         local laserBlastAnimationInstance = Instance.new("Animation")
         laserBlastAnimationInstance.AnimationId = Animations.LaserBlast
@@ -151,7 +146,8 @@ function LaserBlast:nonPrivilegedSetup()
         laserBlastAnimation:Play()
 
         laserBlastAnimation:GetMarkerReachedSignal("fire"):Connect(function()
-            origin.Cube.Attachment.Pulse:Emit(origin.Cube.Attachment.Pulse:GetAttribute("EmitCount"))
+            origin.Core.Attachment.Pulse:Emit(origin.Core.Attachment.Pulse:GetAttribute("EmitCount"))
+            origin.Core.Attachment.Needles:Emit(origin.Core.Attachment.Needles:GetAttribute("EmitCount"))
             laserBlastAnimation:AdjustWeight(0.9, 0.3)
             Laser:laser(rootPart.CFrame + rootPart.CFrame.LookVector * 2.5, Color3.fromRGB(111, 100, 255), 0)
 

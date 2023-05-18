@@ -5,6 +5,9 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local Utilities = script.Utilities
+local weld = require(Utilities.weld)
+
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
 local Packages = replicatedStorageFolder.Packages
@@ -12,6 +15,9 @@ local Ropost = require(Packages.Ropost)
 local Flipper = require(Packages.Flipper)
 
 local SharedAssets = replicatedStorageFolder.SharedAssets
+
+local Modules = SharedAssets.Modules
+local Portals = require(Modules.Portals)
 
 local Constants = require(SharedAssets.Constants)
 local Configuration = require(SharedAssets.Configuration)
@@ -34,15 +40,31 @@ local cubesFolder = workspace:WaitForChild(Constants.CUBES_FOLDER_IDENTIFIER)
 
 local abilities = {}
 
-local SPRING_CONFIG = {
-    frequency = 4,
-    dampingRatio = 0.9,
+local SPRING_CONFIGS = {
+    MOVEMENT = {
+        frequency = 4,
+        dampingRatio = 0.9,
+    },
+    EQUIP = {
+        frequency = 4,
+        dampingRatio = 0.6,
+    },
 }
 local TWEEN_INFO = {
     ROTATION = TweenInfo.new(rng:NextNumber(0.5, 0.7), Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
     ROTATION_ACTION = TweenInfo.new(1.5, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
     HIGHLIGHT = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+    EQUIP = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+    SINK = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 }
+
+local function toggleParticles(instance: Instance, isEnabled: boolean)
+    for _, descendant in instance:GetDescendants() do
+        if descendant:IsA("ParticleEmitter") then
+            descendant.Enabled = isEnabled
+        end
+    end
+end
 
 local function createCube(player: Player, character: Model)
     debugPrint(string.format("creating Byzantium cube for player \"%s\"", player.Name))
@@ -69,12 +91,21 @@ local function createCube(player: Player, character: Model)
         x = offsetAttachment.WorldPosition.X,
         y = offsetAttachment.WorldPosition.Y,
         z = offsetAttachment.WorldPosition.Z,
+        equipAlpha = 1,
     })
-    cubeMotor:onStep(function(position)
-        cubeClone.Position = Vector3.new(position.x, position.y, position.z)
+    
+    local lastEquipAlpha = 1
+    cubeMotor:onStep(function(values)
+        if values.equipAlpha == lastEquipAlpha then
+            cubeClone.Position = Vector3.new(values.x, values.y, values.z)
+       else
+            cubeClone.Position = Vector3.new(offsetAttachment.WorldPosition.X, offsetAttachment.WorldPosition.Y + 25, offsetAttachment.WorldPosition.Z):Lerp(offsetAttachment.WorldPosition, values.equipAlpha)
+       end
+       lastEquipAlpha = values.equipAlpha
     end)
 
     cubeClone.Hum:Play()
+    cubeClone.ActionOff:Play()
 
     local isInAction = false
 
@@ -82,6 +113,10 @@ local function createCube(player: Player, character: Model)
     local elapsed = 0
     local goal = rng:NextNumber(2, 4)
     local cubeRotationConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+            return
+        end
+
         elapsed += deltaTime
         if elapsed >= goal and not isInAction then
             local tween = TweenService:Create(cubeClone, TWEEN_INFO.ROTATION, {
@@ -107,17 +142,17 @@ local function createCube(player: Player, character: Model)
             })
         else
             cubeMotor:setGoal({
-                x = Flipper.Spring.new(newPosition.X, SPRING_CONFIG),
-                y = Flipper.Spring.new(newPosition.Y, SPRING_CONFIG),
-                z = Flipper.Spring.new(newPosition.Z, SPRING_CONFIG),
+                x = Flipper.Spring.new(newPosition.X, SPRING_CONFIGS.MOVEMENT),
+                y = Flipper.Spring.new(newPosition.Y, SPRING_CONFIGS.MOVEMENT),
+                z = Flipper.Spring.new(newPosition.Z, SPRING_CONFIGS.MOVEMENT),
             })
         end
 
         lastPosition = newPosition
     end)
 
-    local attributeChangedConnection = nil
-    attributeChangedConnection = character:GetAttributeChangedSignal(Constants.ACTION_ATTRIBUTE_IDENTIFIER):Connect(function()
+    local actionAttributeChangedConnection = nil
+    actionAttributeChangedConnection = character:GetAttributeChangedSignal(Constants.ACTION_ATTRIBUTE_IDENTIFIER):Connect(function()
         if character:GetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER) then
             local tween = TweenService:Create(cubeClone, TWEEN_INFO.ROTATION_ACTION, {
                 Orientation = Vector3.new(rng:NextNumber(-5020, 5020), rng:NextNumber(-5020, 5020), rng:NextNumber(-5020, 5020)),
@@ -129,8 +164,63 @@ local function createCube(player: Player, character: Model)
             highlightAppearTween:Play()
         else
             isInAction = false
-            cubeClone.Action:Play()
+            cubeClone.ActionOff:Play()
             highlightFadeTween:Play()
+        end
+    end)
+
+    local equippedAttributeChangedConnection = character:GetAttributeChangedSignal(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER):Connect(function()
+        if character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+            local transparencyTween = TweenService:Create(cubeClone, TWEEN_INFO.EQUIP, {
+                Transparency = 0,
+            })
+
+            local highlightTransparencyTween = TweenService:Create(cubeClone.Highlight, TWEEN_INFO.EQUIP, {
+                FillTransparency = 0.8,
+                OutlineTransparency = 0,
+            })
+
+            transparencyTween:Play()
+            highlightTransparencyTween:Play()
+
+            cubeMotor:setGoal({
+                equipAlpha = Flipper.Spring.new(1, SPRING_CONFIGS.EQUIP),
+            })
+
+            toggleParticles(cubeClone, true)
+
+            cubeClone.Summon:Play()
+        else
+            local transparencyTween = TweenService:Create(cubeClone, TWEEN_INFO.EQUIP, {
+                Transparency = 1,
+            })
+
+            local positionTween = TweenService:Create(cubeClone, TWEEN_INFO.SINK, {
+                Position = cubeClone.Position - Vector3.new(0, 2.4, 0),
+            })
+
+            local highlightTransparencyTween = TweenService:Create(cubeClone.Highlight, TWEEN_INFO.EQUIP, {
+                FillTransparency = 1,
+                OutlineTransparency = 1,
+            })
+
+            Portals.createDartPortal(CFrame.new(cubeClone.Position - Vector3.new(0, 2, 0)))
+
+            task.delay(0.4, function()
+                transparencyTween:Play()
+                positionTween:Play()
+                highlightTransparencyTween:Play()
+
+                positionTween.Completed:Connect(function()
+                    cubeMotor:setGoal({
+                        equipAlpha = Flipper.Instant.new(0),
+                    })
+                end)
+
+                toggleParticles(cubeClone, false)
+
+                cubeClone.Unsummon:Play()
+            end)
         end
     end)
 
@@ -140,8 +230,10 @@ local function createCube(player: Player, character: Model)
         characterRemovingConnection = nil
         cubeRotationConnection:Disconnect()
         cubeRotationConnection = nil
-        attributeChangedConnection:Disconnect()
-        attributeChangedConnection = nil
+        actionAttributeChangedConnection:Disconnect()
+        actionAttributeChangedConnection = nil
+        equippedAttributeChangedConnection:Disconnect()
+        equippedAttributeChangedConnection = nil
         
         cubeClone:Destroy()
     end)

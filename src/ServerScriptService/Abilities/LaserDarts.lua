@@ -43,6 +43,10 @@ function LaserDarts:setup()
             return
         end
 
+        if not character:GetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER) then
+		    character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
+	    end
+
         local amountOfDarts = math.random(6, 10)
 
         task.spawn(function()
@@ -59,6 +63,7 @@ function LaserDarts:setup()
 
         channel:publish("laserDarts", {
             target = target,
+            amountOfDarts = amountOfDarts,
         }, Players:GetPlayers())
     end)
 end

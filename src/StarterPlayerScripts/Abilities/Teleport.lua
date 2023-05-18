@@ -40,7 +40,7 @@ function Teleport:nonPrivilegedSetup()
         local destination = data.destination
 
         Portals.createTeleportationPortal(origin, portalsFolder.Gateways)
-        Portals.createTeleportationPortal(destination, portalsFolder.Entrance)
+        Portals.createTeleportationPortal(destination * CFrame.fromEulerAnglesXYZ(0, math.rad(180), 0), portalsFolder.Entrance)
     end)
 end
 
