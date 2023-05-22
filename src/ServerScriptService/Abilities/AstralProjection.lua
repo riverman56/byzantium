@@ -315,6 +315,10 @@ channel:subscribe("astralProject", function(data, envelope)
 		local fakeForcefield = Instance.new("ForceField")
 		fakeForcefield.Visible = false
 		fakeForcefield.Parent = victimCharacter
+
+		channel:publish("project", {
+			victim = victim,
+		}, Players:GetPlayers())
 	end)
 	
 	victimAnimation:Play()
@@ -377,6 +381,10 @@ channel:subscribe("selfProject", function(_, envelope)
     task.delay(1.5, function()
          character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
     end)
+
+	channel:publish("project", {
+		victim = player,
+	}, Players:GetPlayers())
 
 	channel:publish("astralProjectInitialVictim", {}, { player })
 

@@ -5,9 +5,6 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
-local Utilities = script.Utilities
-local weld = require(Utilities.weld)
-
 local replicatedStorageFolder = ReplicatedStorage:WaitForChild("Byzantium")
 
 local Packages = replicatedStorageFolder.Packages
@@ -61,6 +58,10 @@ local TWEEN_INFO = {
 local function toggleParticles(instance: Instance, isEnabled: boolean)
     for _, descendant in instance:GetDescendants() do
         if descendant:IsA("ParticleEmitter") then
+            if not isEnabled then
+                descendant:Clear()
+            end
+            
             descendant.Enabled = isEnabled
         end
     end

@@ -40,10 +40,6 @@ function LaserBlast:setup()
         task.delay(1.5, function()
             character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
         end)
-
-        channel:publish("laserBlast", {
-            player = player,
-        }, Players:GetPlayers())
     end)
 end
 

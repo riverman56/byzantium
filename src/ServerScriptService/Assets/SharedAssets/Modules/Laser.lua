@@ -7,6 +7,7 @@ local TWEEN_INFO = {
 	POSITION_2 = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 	
 	TRANSPARENCY_OUT = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+	LIGHT_TRANSPARENCY = TweenInfo.new(1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
 	
 	TIME_SCALE = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
 }
@@ -115,6 +116,9 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	local transparencyOutTween = TweenService:Create(laserClone.Sphere, TWEEN_INFO.TRANSPARENCY_OUT, {
 		Transparency = 1,
 	})
+	local lightTween = TweenService:Create(laserClone.Sphere.SurfaceLight, TWEEN_INFO.LIGHT_TRANSPARENCY, {
+		Brightness = 0
+	})
 
 	transparencyOutTween.Completed:Connect(function()
 		task.wait(5)
@@ -124,7 +128,8 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	laserClone.Parent = workspace
 
 	laserClone.Sphere.Fire:Play()
-		
+	
+	lightTween:Play()
 	transparencyTween:Play()
 	position1Tween:Play()
 	position1Tween.Completed:Connect(function()

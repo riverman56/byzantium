@@ -71,7 +71,7 @@ function Ragdoll:setRagdoll(character: Model, isRagdolled: boolean)
         return
     end
 
-    humanoid:ChangeState(if isRagdolled then Enum.HumanoidStateType.Physics else Enum.HumanoidStateType.FallingDown)
+    humanoid:ChangeState(if isRagdolled then Enum.HumanoidStateType.Physics else Enum.HumanoidStateType.Freefall)
 
     for _, ballSocketConstraint in character:GetDescendants() do
         if ballSocketConstraint:IsA("BallSocketConstraint") then

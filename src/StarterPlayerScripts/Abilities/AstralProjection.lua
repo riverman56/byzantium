@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local Chat = game:GetService("Chat")
 
 local byzantiumRoot = script.Parent.Parent
 
@@ -24,18 +25,18 @@ local getFakeProjectionCharacter = require(SharedUtilities.getFakeProjectionChar
 local Constants = require(SharedAssets.Constants)
 
 local Content = SharedAssets.Content
+local ProjectionParticles = Content.ProjectionParticles
 local ProjectionOrb = Content.ProjectionOrb
 local Animations = require(Content.Animations)
 
 local Modules = SharedAssets.Modules
+local Environment = require(Modules.Environment)
 local TopbarPlus = require(Modules.TopbarPlus)
 
 local fakeCharactersFolder = workspace:WaitForChild(Constants.FAKE_CHARACTERS_FOLDER_IDENTIFIER)
 
 local localPlayer = Players.LocalPlayer
 local channel = Ropost.channel("Byzantium")
-
-local defaultGravity = workspace.Gravity
 
 local isFlying = false
 
@@ -45,9 +46,13 @@ local limbDragForces = {}
 local vectorForce = nil
 local alignOrientation = nil
 
+local postController = Environment.PPEController
+local atmosphereController = Environment.AtmosphereController
+local cameraController = Environment.CameraController
+
 local CONFIGURATION = {
 	DRAG = 3,
-	FORCE = 300,
+	FORCE = 450,
 
 	-- the higher the drag exponent, the faster the part will come to a stop
 	DRAG_EXPONENT = 1.4,
@@ -57,6 +62,39 @@ local CONFIGURATION = {
 	ALIGN_ORIENTATION_RESPONSIVENESS = 180,
 
 	UNPROJECT_KEYBIND = Enum.KeyCode.Q,
+
+	PPE_STATES = {
+		PROJECTED = {
+			colorCorrection = {
+				Brightness = 0.1,
+				Contrast = 0.2,
+				Saturation = -0.7,
+				TintColor = Color3.fromRGB(149, 135, 255),
+			},
+			depthOfField = {
+				FarIntensity = 1,
+				FocusDistance = 50,
+				InFocusRadius = 50,
+			},
+			bloom = {
+				Intensity = 4,
+			}
+		},
+	},
+	ATMOSPHERE_STATES = {
+		PROJECTED = {
+			Density = 0.442,
+			Color = Color3.fromRGB(179, 163, 255),
+			Decay = Color3.fromRGB(151, 155, 252),
+			Glare = 3.08,
+			Haze = 2.12,
+		},
+	},
+	CAMERA_STATES = {
+		PROJECTED = {
+			FieldOfView = 120,
+		}
+	},
 }
 local TWEEN_INFO = {
 	PROJECTION_ORB_POSITION = TweenInfo.new(1.8, Enum.EasingStyle.Quart, Enum.EasingDirection.InOut),
@@ -66,6 +104,18 @@ local SPRING_CONFIG = {
 	PROJECTION_ORB_SCALE = {
 		frequency = 1.8,
 		dampingRatio = 1,
+	},
+	PPE = {
+		frequency = 1,
+		dampingRatio = 1,
+	},
+	CAMERA1 = {
+		frequency = 3.7,
+		dampingRatio = 1.5,
+	},
+	CAMERA2 = {
+		frequency = 2,
+		dampingRatio = 0.6,
 	},
 }
 local LIMBS_SLOWED_PHYSICS = {
@@ -82,6 +132,21 @@ unprojectIcon:setLabel("[Q] Leave Astral Dimension")
 unprojectIcon:setImage("rbxassetid://13350796392")
 unprojectIcon:setEnabled(false)
 unprojectIcon:bindToggleKey(CONFIGURATION.UNPROJECT_KEYBIND)
+
+local function doProjectionParticles(position: Vector3)
+	local projectionParticlesClone = ProjectionParticles:Clone()
+	projectionParticlesClone.Position = position
+	projectionParticlesClone.Parent = workspace
+	for _, descendant in projectionParticlesClone:GetDescendants() do
+		if descendant:IsA("ParticleEmitter") then
+			descendant:Emit(descendant:GetAttribute("EmitCount"))
+		end
+	end
+
+	task.delay(5, function()
+		projectionParticlesClone:Destroy()
+	end)
+end
 
 -- sets the Transform property of character's motors to that of FakeCharacter's
 local function matchMotors(character: Model, fakeCharacter: Model)
@@ -132,8 +197,7 @@ local function setProjectionPhysics(enabled: boolean)
 		isFlying = true
 		vectorForce.Enabled = true
 		alignOrientation.Enabled = true
-		humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-		workspace.Gravity = 0
+		--humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
 		-- apply the velocities of the currently playing animations to the
 		-- joints for a smoother transition
@@ -217,14 +281,15 @@ local function setProjectionPhysics(enabled: boolean)
 				vectorForce.Force += dragVector * CONFIGURATION.DRAG * trueCharacterMass * (rootPart.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.DRAG_EXPONENT)
 			end
 
-			-- apply a drag force to each limb
+			-- apply anti-gravity and drag forces to each limb
 			for _, descendant in character:GetDescendants() do
 				if descendant:IsA("BasePart") and table.find(LIMBS_SLOWED_PHYSICS, descendant.Name) then
 					local dragVectorForce = limbDragForces[descendant.Name]
-
+					dragVectorForce.Force = Vector3.new(0, workspace.Gravity, 0) * descendant.Mass
+					
 					if descendant.AssemblyLinearVelocity.Magnitude > 0 then
 						local dragVector = -descendant.AssemblyLinearVelocity.Unit
-						dragVectorForce.Force = dragVector * CONFIGURATION.DRAG * descendant:GetMass() * (descendant.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.LIMB_DRAG_EXPONENT)
+						dragVectorForce.Force += dragVector * CONFIGURATION.DRAG * descendant.Mass * (descendant.AssemblyLinearVelocity.Magnitude ^ CONFIGURATION.LIMB_DRAG_EXPONENT)
 					end
 				end
 			end
@@ -238,8 +303,7 @@ local function setProjectionPhysics(enabled: boolean)
 		isFlying = false
 		vectorForce.Enabled = false
 		alignOrientation.Enabled = false
-		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-		workspace.Gravity = defaultGravity
+		--humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 
 		connection:Disconnect()
 		connection = nil
@@ -412,6 +476,39 @@ function AstralProjection:nonPrivilegedSetup()
 	end
 	localPlayer.CharacterAdded:Connect(onLocalCharacterAdded)
 
+	channel:subscribe("project", function(data)
+		local victim = data.victim
+
+		local victimCharacter = victim.Character
+		if not victimCharacter then
+			return
+		end
+
+		local victimRootPart = victimCharacter:FindFirstChild("HumanoidRootPart")
+		if not victimRootPart then
+			return
+		end
+
+		postController:set(CONFIGURATION.PPE_STATES.PROJECTED, SPRING_CONFIG.PPE)
+		atmosphereController:set(CONFIGURATION.ATMOSPHERE_STATES.PROJECTED, SPRING_CONFIG.PPE)
+		cameraController:set(CONFIGURATION.CAMERA_STATES.PROJECTED, SPRING_CONFIG.CAMERA1)
+		task.delay(0.5, function()
+			cameraController:reset(SPRING_CONFIG.CAMERA2)
+		end)
+
+		doProjectionParticles(victimRootPart.Position)
+
+		Chat:SetBubbleChatSettings({
+			BackgroundColor3 = Color3.fromRGB(31, 31, 31),
+			UserSpecificSettings = {
+				[victim.UserId] = {
+					BackgroundColor3 = Color3.fromRGB(31, 31, 31),
+					TextColor3 = Color3.fromRGB(123, 54, 172),
+				},
+			},
+		})
+	end)
+
 	channel:subscribe("unproject", function(data)
 		local target = data.target
 		local origin = data.origin
@@ -421,6 +518,15 @@ function AstralProjection:nonPrivilegedSetup()
 		if not targetCharacter then
 			return
 		end
+
+		Chat:SetBubbleChatSettings({
+			UserSpecificSettings = {
+				[target.UserId] = {
+					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					TextColor3 = Color3.fromRGB(0, 0, 0),
+				},
+			},
+		})
 
 		local projectionOrbClone = ProjectionOrb:Clone()
 		projectionOrbClone.Position = origin
@@ -495,10 +601,17 @@ function AstralProjection:nonPrivilegedSetup()
 				channel:publish("refresh", {
 					cframe = CFrame.new(destination + Vector3.new(0, 3, 0)),
 				})
-			end
 
-			coreCall("SetCoreGuiEnabled", Enum.CoreGuiType.Backpack, true)
-			coreCall("SetCore", "ResetButtonCallback", true)
+				coreCall("SetCoreGuiEnabled", Enum.CoreGuiType.Backpack, true)
+				coreCall("SetCore", "ResetButtonCallback", true)
+
+				postController:reset(SPRING_CONFIG.PPE)
+				atmosphereController:reset(SPRING_CONFIG.PPE)
+				cameraController:set(CONFIGURATION.CAMERA_STATES.PROJECTED, SPRING_CONFIG.CAMERA1)
+				task.delay(0.2, function()
+					cameraController:reset(SPRING_CONFIG.CAMERA2)
+				end)
+			end
 		end)
 
 		if target == localPlayer then

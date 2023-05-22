@@ -3,7 +3,7 @@ local function getMass(instance: Instance): number
 
 	for _, basePart in instance:GetDescendants() do
 		if basePart:IsA("BasePart") and basePart.Massless ~= true then
-			mass += basePart:GetMass()
+			mass += basePart.Mass
 		end
 	end
 
