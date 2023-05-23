@@ -489,12 +489,14 @@ function AstralProjection:nonPrivilegedSetup()
 			return
 		end
 
-		postController:set(CONFIGURATION.PPE_STATES.PROJECTED, SPRING_CONFIG.PPE)
-		atmosphereController:set(CONFIGURATION.ATMOSPHERE_STATES.PROJECTED, SPRING_CONFIG.PPE)
-		cameraController:set(CONFIGURATION.CAMERA_STATES.PROJECTED, SPRING_CONFIG.CAMERA1)
-		task.delay(0.5, function()
-			cameraController:reset(SPRING_CONFIG.CAMERA2)
-		end)
+		if victim == localPlayer then
+			postController:set(CONFIGURATION.PPE_STATES.PROJECTED, SPRING_CONFIG.PPE)
+			atmosphereController:set(CONFIGURATION.ATMOSPHERE_STATES.PROJECTED, SPRING_CONFIG.PPE)
+			cameraController:set(CONFIGURATION.CAMERA_STATES.PROJECTED, SPRING_CONFIG.CAMERA1)
+			task.delay(0.4, function()
+				cameraController:reset(SPRING_CONFIG.CAMERA2)
+			end)
+		end
 
 		doProjectionParticles(victimRootPart.Position)
 
@@ -586,15 +588,6 @@ function AstralProjection:nonPrivilegedSetup()
 
 			task.delay(5, function()
 				projectionOrbClone:Destroy()
-			end)
-
-			task.delay(0.15, function()
-				local fakeCharacter = getFakeProjectionCharacter(target)
-				if not fakeCharacter then
-					return
-				end
-				
-				fakeCharacter:Destroy()
 			end)
 
 			if target == localPlayer then
@@ -723,6 +716,11 @@ function AstralProjection:run()
 	end
 
 	if targetCharacter:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER) or targetCharacter:GetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER) then
+		return
+	end
+
+	local existingFakeCharacter = fakeCharactersFolder:FindFirstChild(targetPlayer.Name)
+	if existingFakeCharacter then
 		return
 	end
 

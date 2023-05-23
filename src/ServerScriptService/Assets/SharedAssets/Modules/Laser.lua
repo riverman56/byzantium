@@ -111,13 +111,13 @@ function Laser:laser(cframe: CFrame, color: Color3)
 	})
 	local position2Tween = TweenService:Create(laserClone.Sphere, TWEEN_INFO.POSITION_2, {
 		CFrame = laserClone.Root.CFrame + (laserClone.Root.CFrame.LookVector.Unit * (150 / 2)),
-		Size = Vector3.new(0.001, 0.001, 150),
+		Size = Vector3.new(0, 0, 150),
 	})
 	local transparencyOutTween = TweenService:Create(laserClone.Sphere, TWEEN_INFO.TRANSPARENCY_OUT, {
 		Transparency = 1,
 	})
 	local lightTween = TweenService:Create(laserClone.Sphere.SurfaceLight, TWEEN_INFO.LIGHT_TRANSPARENCY, {
-		Brightness = 0
+		Brightness = 0,
 	})
 
 	transparencyOutTween.Completed:Connect(function()

@@ -36,8 +36,8 @@ local fakeCharactersFolder = workspace:FindFirstChild(Constants.FAKE_CHARACTERS_
 local channel = Ropost.channel("Byzantium")
 
 local CONFIGURATION = {
-	PROJECTION_GHOST_TRANSPARENCY = 0,
-	PROJECTION_GHOST_MATERIAL = Enum.Material.ForceField,
+	PROJECTION_GHOST_TRANSPARENCY = 0.8,
+	PROJECTION_GHOST_MATERIAL = Enum.Material.Neon,
 	PROJECTION_GHOST_BODY_COLOR = Color3.fromRGB(111, 100, 255),
 }
 
@@ -187,16 +187,18 @@ channel:subscribe("astralProjectInitial", function(data, envelope)
 		return
 	end
 
-	local existingFakeCharacter = fakeCharactersFolder:FindFirstChild(victim.Name)
-	if existingFakeCharacter then
-		existingFakeCharacter:Destroy()
+	local victimHumanoid = victimCharacter:FindFirstChildOfClass("Humanoid")
+	if not victimHumanoid then
+		return
 	end
 
 	victimCharacter:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER, true)
 	character:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTING_ATTRIBUTE_IDENTIFIER, true)
 	character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
 
-	victimRootPart.Anchored = true
+	victimHumanoid.WalkSpeed = 0
+	victimHumanoid.JumpPower = 0
+	victimHumanoid.AutoRotate = false
 
 	local fakeCharacter = createFakeCharacter(victim)
 	if not fakeCharacter then
@@ -377,6 +379,8 @@ channel:subscribe("selfProject", function(_, envelope)
 		character:SetAttribute(Constants.EQUIPPED_ATTRIBUTE_IDENTIFIER, true)
 	end
 
+	character:SetAttribute(Constants.ASTRAL_PROJECTION.PROJECTED_ATTRIBUTE_IDENTIFIER, true)
+
 	character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, true)
     task.delay(1.5, function()
          character:SetAttribute(Constants.ACTION_ATTRIBUTE_IDENTIFIER, false)
@@ -453,10 +457,6 @@ channel:subscribe("unproject", function(data, envelope)
 		origin = rootPart.Position,
 		destination = fakeRootPart.Position,
 	}, Players:GetPlayers())
-
-	task.delay(5, function()
-		fakeCharacter:Destroy()
-	end)
 end)
 
 -- if the player leaves or respawns while projected, clean up their fake

@@ -52,7 +52,7 @@ local TWEEN_INFO = {
     ROTATION_ACTION = TweenInfo.new(1.5, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
     HIGHLIGHT = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
     EQUIP = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-    SINK = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    SINK = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 }
 
 local function toggleParticles(instance: Instance, isEnabled: boolean)
@@ -99,10 +99,10 @@ local function createCube(player: Player, character: Model)
     cubeMotor:onStep(function(values)
         if values.equipAlpha == lastEquipAlpha then
             cubeClone.Position = Vector3.new(values.x, values.y, values.z)
-       else
+        else
             cubeClone.Position = Vector3.new(offsetAttachment.WorldPosition.X, offsetAttachment.WorldPosition.Y + 25, offsetAttachment.WorldPosition.Z):Lerp(offsetAttachment.WorldPosition, values.equipAlpha)
-       end
-       lastEquipAlpha = values.equipAlpha
+        end
+        lastEquipAlpha = values.equipAlpha
     end)
 
     cubeClone.Hum:Play()
@@ -242,7 +242,7 @@ end
 
 local function onRegister(data)
     local target = data.target
-    print(string.format("received Byzantium registration for \"%s\"", target.Name))
+    debugPrint(string.format("received Byzantium registration for \"%s\"", target.Name))
 
     if target == localPlayer then
         for _, ability in abilities do

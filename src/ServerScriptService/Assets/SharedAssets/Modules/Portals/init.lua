@@ -1,9 +1,9 @@
-local DartPortal = require(script.DartPortal)
-local TeleportationPortal = require(script.TeleportationPortal)
+local createDartPortal = require(script.createDartPortal)
+local createTeleportationPortal = require(script.createTeleportationPortal)
 
 local Portals = {
-    createDartPortal = DartPortal.new,
-    createTeleportationPortal = TeleportationPortal.new,
+    createDartPortal = createDartPortal,
+    createTeleportationPortal = createTeleportationPortal,
 }
 
 return Portals

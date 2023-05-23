@@ -89,8 +89,7 @@ function AtmosphereController:set(state: Types.AtmosphereState, springConfig: Ty
 end
 
 function AtmosphereController:reset(springConfig: Types.SpringConfig)
-    local goalState = Constants.DEFAULT_PROPERTIES
-    self:set(goalState, springConfig)
+    self:set(Constants.DEFAULT_PROPERTIES:: Types.AtmosphereState, springConfig)
 end
 
 return AtmosphereController

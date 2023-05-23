@@ -46,7 +46,7 @@ function LaserDarts:nonPrivilegedSetup()
         for _ = 0, amountOfDarts do
             local rootWithRandomDirection = targetRootPart.CFrame * CFrame.fromEulerAnglesXYZ(math.rad(rng:NextNumber(-45, 45)), math.rad(rng:NextNumber(-45, 45)), math.rad(rng:NextNumber(-45, 45)))
             local goalCFrame = rootWithRandomDirection + rootWithRandomDirection.UpVector * rng:NextNumber(10, 50)
-            Portals.createDartPortal(goalCFrame)
+            Portals.createDartPortal(goalCFrame, workspace)
             task.delay(0.4, function()
                 Laser:dart(goalCFrame * CFrame.fromEulerAnglesXYZ(math.rad(-90), 0, 0), Color3.fromRGB(111, 100, 255))
                 

@@ -11,6 +11,9 @@ export type PPEState = {
 
 export type PPEController = {
     postEffectInstances: PostEffectInstances,
+    _originalState: PPEState,
+    _goalstate: PPEState,
+    motor: {},
 }
 
 export type SpringConfig = {
